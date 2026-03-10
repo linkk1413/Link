@@ -51,7 +51,8 @@ export type ReportTargetType =
   | "PROVIDER"
   | "SERVICE"
   | "BOOKING"
-  | "MESSAGE";
+  | "MESSAGE"
+  | "REVIEW";
 
 // Report status
 export type ReportStatus = "PENDING" | "REVIEWED" | "RESOLVED" | "DISMISSED";
@@ -272,10 +273,27 @@ export interface Review {
 export interface Report {
   id: string;
   reporterId: string;
+  reporterName?: string;
   targetType: ReportTargetType;
   targetId: string;
   reason: string;
+  description?: string;
   status: ReportStatus;
+  // Context fields for admin display
+  targetOwnerId?: string; // e.g. provider who owns the review, or user being reported
+  targetOwnerName?: string;
+  targetContent?: string; // snapshot of the reported content (review text, message, etc.)
+  adminNotes?: string;
+  resolvedAt?: Date;
+  resolvedBy?: string;
+  createdAt: Date;
+}
+
+// Blocked user
+export interface BlockedUser {
+  id: string;
+  blockerId: string; // user who initiated the block
+  blockedUserId: string; // user who is blocked
   createdAt: Date;
 }
 

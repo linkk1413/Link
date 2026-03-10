@@ -13,6 +13,7 @@ import {
   ChevronRight,
   KeyRound,
   Trash2,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -36,6 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useRequestTrackingConsent } from "@/components/TrackingConsent";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGuest } from "@/contexts/GuestContext";
 import { updateUserProfile } from "@/lib/firestore";
@@ -49,6 +51,8 @@ const ClientProfilePage: React.FC = () => {
   const { isGuest } = useGuest();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
+  const { consentStatus, revokeConsent, requestTrackingConsent } =
+    useRequestTrackingConsent();
   const isArabic = i18n.language === "ar";
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -482,6 +486,42 @@ const ClientProfilePage: React.FC = () => {
                     onCheckedChange={(checked) =>
                       setTheme(checked ? "dark" : "light")
                     }
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </motion.section>
+
+          {/* Privacy */}
+          <motion.section variants={fadeInUp} className="mb-6">
+            <h3 className="mb-3 text-sm font-medium text-muted-foreground">
+              {t("profile.privacy")}
+            </h3>
+            <Card>
+              <CardContent className="p-0">
+                <div className="flex items-center gap-3 p-4 transition-colors hover:bg-accent">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <MapPin className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex flex-col">
+                      <span className="truncate">
+                        {t("profile.locationAccess")}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {t("profile.locationAccessDescription")}
+                      </span>
+                    </div>
+                  </div>
+                  <Switch
+                    className="shrink-0"
+                    checked={consentStatus === "granted"}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        requestTrackingConsent();
+                      } else {
+                        revokeConsent();
+                        toast.success(t("profile.locationAccessRevoked"));
+                      }
+                    }}
                   />
                 </div>
               </CardContent>

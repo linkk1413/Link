@@ -30,6 +30,10 @@ import {
   Payment,
   BannerSettings,
   ProviderBannerSettings,
+  Report,
+  ReportStatus,
+  ReportTargetType,
+  BlockedUser,
 } from "@/types";
 
 // Collection names
@@ -45,6 +49,8 @@ export const COLLECTIONS = {
   REVIEWS: "reviews",
   PAYOUTS: "payouts",
   SETTINGS: "settings",
+  REPORTS: "reports",
+  BLOCKED_USERS: "blockedUsers",
 } as const;
 
 // Convert Firestore timestamp to Date
@@ -1819,4 +1825,143 @@ export const updateSubscriptionSettings = async (
     },
     { merge: true },
   );
+};
+
+// ==================== REPORTS ====================
+
+export const createReport = async (
+  data: Omit<Report, "id" | "createdAt" | "status">,
+): Promise<string> => {
+  const colRef = collection(db, COLLECTIONS.REPORTS);
+  const docRef = await addDoc(colRef, {
+    ...data,
+    status: "PENDING" as ReportStatus,
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+};
+
+export const getReports = async (
+  statusFilter?: ReportStatus,
+): Promise<Report[]> => {
+  const colRef = collection(db, COLLECTIONS.REPORTS);
+  const q = query(colRef, orderBy("createdAt", "desc"));
+  const snapshot = await getDocs(q);
+  const reports = snapshot.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      ...data,
+      createdAt: timestampToDate(data.createdAt),
+      resolvedAt: data.resolvedAt
+        ? timestampToDate(data.resolvedAt)
+        : undefined,
+    } as Report;
+  });
+  if (statusFilter) {
+    return reports.filter((r) => r.status === statusFilter);
+  }
+  return reports;
+};
+
+export const getReportsByReporter = async (
+  reporterId: string,
+): Promise<Report[]> => {
+  const colRef = collection(db, COLLECTIONS.REPORTS);
+  const q = query(
+    colRef,
+    where("reporterId", "==", reporterId),
+    orderBy("createdAt", "desc"),
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      ...data,
+      createdAt: timestampToDate(data.createdAt),
+    } as Report;
+  });
+};
+
+export const updateReportStatus = async (
+  reportId: string,
+  status: ReportStatus,
+  adminNotes?: string,
+  resolvedBy?: string,
+): Promise<void> => {
+  const docRef = doc(db, COLLECTIONS.REPORTS, reportId);
+  const updates: any = { status };
+  if (adminNotes !== undefined) updates.adminNotes = adminNotes;
+  if (status === "RESOLVED" || status === "DISMISSED") {
+    updates.resolvedAt = serverTimestamp();
+    if (resolvedBy) updates.resolvedBy = resolvedBy;
+  }
+  await updateDoc(docRef, updates);
+};
+
+// ==================== BLOCKED USERS ====================
+
+export const blockUser = async (
+  blockerId: string,
+  blockedUserId: string,
+): Promise<string> => {
+  const colRef = collection(db, COLLECTIONS.BLOCKED_USERS);
+  const docRef = await addDoc(colRef, {
+    blockerId,
+    blockedUserId,
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+};
+
+export const unblockUser = async (
+  blockerId: string,
+  blockedUserId: string,
+): Promise<void> => {
+  const colRef = collection(db, COLLECTIONS.BLOCKED_USERS);
+  const q = query(
+    colRef,
+    where("blockerId", "==", blockerId),
+    where("blockedUserId", "==", blockedUserId),
+  );
+  const snapshot = await getDocs(q);
+  const batch = writeBatch(db);
+  snapshot.docs.forEach((d) => batch.delete(d.ref));
+  await batch.commit();
+};
+
+export const getBlockedUsers = async (
+  blockerId: string,
+): Promise<BlockedUser[]> => {
+  const colRef = collection(db, COLLECTIONS.BLOCKED_USERS);
+  const q = query(
+    colRef,
+    where("blockerId", "==", blockerId),
+    orderBy("createdAt", "desc"),
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      ...data,
+      createdAt: timestampToDate(data.createdAt),
+    } as BlockedUser;
+  });
+};
+
+export const isUserBlocked = async (
+  blockerId: string,
+  blockedUserId: string,
+): Promise<boolean> => {
+  const colRef = collection(db, COLLECTIONS.BLOCKED_USERS);
+  const q = query(
+    colRef,
+    where("blockerId", "==", blockerId),
+    where("blockedUserId", "==", blockedUserId),
+    limit(1),
+  );
+  const snapshot = await getDocs(q);
+  return !snapshot.empty;
 };

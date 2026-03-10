@@ -310,7 +310,7 @@ export default function LandingPage() {
               {t("footer.help")}
             </Link>
             <a
-              href="mailto:azsazs112217@gmail.com"
+              href="mailto:60azsazs@gmail.com"
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               {t("footer.contact")}

@@ -11,14 +11,28 @@ import {
   MessageSquare,
   Calendar,
   Navigation,
+  Flag,
+  Ban,
+  MoreVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useProviderProfile, useProviderServices } from "@/hooks/queries";
 import { useReviews } from "@/hooks/queries/useReviews";
 import { useCreateChat } from "@/hooks/queries/useChats";
+import {
+  useBlockUser,
+  useUnblockUser,
+  useIsUserBlocked,
+} from "@/hooks/queries/useBlocks";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRequestTrackingConsent } from "@/components/TrackingConsent";
 import {
@@ -27,6 +41,8 @@ import {
   formatDistance,
 } from "@/hooks/useGeolocation";
 import { Service } from "@/types";
+import { ReportDialog } from "@/components/ReportDialog";
+import { toast } from "sonner";
 
 const ProviderProfilePage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -36,6 +52,7 @@ const ProviderProfilePage: React.FC = () => {
   const isArabic = i18n.language === "ar";
 
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
 
   // Geolocation for distance calculation
   const { location, requestLocation } = useGeolocation();
@@ -70,6 +87,9 @@ const ProviderProfilePage: React.FC = () => {
   }, [location, provider?.latitude, provider?.longitude]);
 
   const createChatMutation = useCreateChat();
+  const blockUserMutation = useBlockUser();
+  const unblockUserMutation = useUnblockUser();
+  const { data: isBlocked } = useIsUserBlocked(user?.uid || "", id || "");
 
   const handleBack = () => {
     navigate(-1);
@@ -92,6 +112,27 @@ const ProviderProfilePage: React.FC = () => {
       navigate(`/client/chats/${chatId}`);
     } catch (error) {
       console.error("Failed to create chat:", error);
+    }
+  };
+
+  const handleBlock = async () => {
+    if (!user || !id) return;
+    try {
+      if (isBlocked) {
+        await unblockUserMutation.mutateAsync({
+          blockerId: user.uid,
+          blockedUserId: id,
+        });
+        toast.success(t("block.unblocked"));
+      } else {
+        await blockUserMutation.mutateAsync({
+          blockerId: user.uid,
+          blockedUserId: id,
+        });
+        toast.success(t("block.blocked"));
+      }
+    } catch (error) {
+      toast.error(t("common.error"));
     }
   };
 
@@ -125,7 +166,31 @@ const ProviderProfilePage: React.FC = () => {
           <Button variant="ghost" size="icon" onClick={handleBack}>
             <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
           </Button>
-          <h1 className="text-lg font-semibold">{t("provider.profile")}</h1>
+          <h1 className="text-lg font-semibold flex-1">
+            {t("provider.profile")}
+          </h1>
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => setReportDialogOpen(true)}
+                  className="text-destructive"
+                >
+                  <Flag className="h-4 w-4 me-2" />
+                  {t("report.reportProvider")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleBlock}>
+                  <Ban className="h-4 w-4 me-2" />
+                  {isBlocked ? t("block.unblock") : t("block.block")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </header>
 
@@ -386,6 +451,20 @@ const ProviderProfilePage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Report Dialog */}
+      {user && id && (
+        <ReportDialog
+          open={reportDialogOpen}
+          onOpenChange={setReportDialogOpen}
+          targetType="PROVIDER"
+          targetId={id}
+          reporterId={user.uid}
+          reporterName={user.name || user.displayName}
+          targetOwnerId={id}
+          targetOwnerName={provider?.displayName}
+        />
+      )}
     </div>
   );
 };

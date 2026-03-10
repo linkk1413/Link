@@ -39,7 +39,8 @@
     "email": "Email",
     "name": "Name",
     "optional": "optional",
-    "notNow": "Not Now"
+    "notNow": "Not Now",
+    "and": "and"
   },
   "bookingStatus": {
     "PENDING": "Pending",
@@ -65,7 +66,9 @@
     "passwordsDoNotMatch": "Passwords do not match",
     "iAccept": "I accept the",
     "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service",
     "acceptPrivacyRequired": "You must accept the Privacy Policy to create an account.",
+    "acceptTermsRequired": "You must accept the Terms of Service and Privacy Policy to create an account.",
     "phone": "Phone Number",
     "invalidPhone": "Please enter a valid Saudi phone number (05XXXXXXXX).",
     "phoneAlreadyInUse": "This phone number is already registered.",
@@ -341,7 +344,11 @@
     "awayFromYou": "away from you",
     "trustedProviderBadge": "Trusted Provider Badge",
     "trusted": "Trusted",
-    "bookingsCompleted": "bookings completed"
+    "bookingsCompleted": "bookings completed",
+    "privacy": "Privacy",
+    "locationAccess": "Location Access",
+    "locationAccessDescription": "Allow the app to use your location for nearby services",
+    "locationAccessRevoked": "Location access revoked"
   },
   "help": {
     "title": "Help Center",
@@ -379,7 +386,7 @@
           "Click 'Delete Account' to permanently delete your account.",
           "All your data will be permanently deleted including your profile, bookings history, reviews, and messages.",
           "This action cannot be undone.",
-          "You can also delete your account by reaching out to our Help Center at support@link-22.com."
+          "You can also delete your account by reaching out to our Help Center at 60azsazs@gmail.com."
         ]
       },
       "privacy": {
@@ -402,6 +409,15 @@
           "Chat is available after a booking is created.",
           "Keep conversations respectful and on-topic.",
           "Notifications can be managed in Profile preferences."
+        ]
+      },
+      "reportContact": {
+        "title": "Report Inappropriate Content",
+        "items": [
+          "If you encounter inappropriate content, use the Report button on the content or user's profile.",
+          "You can also block users who violate community guidelines.",
+          "For urgent safety concerns, contact us directly at 60azsazs@gmail.com.",
+          "All reports are reviewed within 24 hours."
         ]
       }
     },
@@ -544,7 +560,8 @@
       "users": "Users",
       "verifications": "Verifications",
       "payouts": "Payouts",
-      "subscriptions": "Subscriptions"
+      "subscriptions": "Subscriptions",
+      "reports": "Reports"
     },
     "usersManagement": "Users Management",
     "usersDescription": "View and manage all users in the platform",
@@ -904,5 +921,74 @@
     "saveBookings": "save your bookings",
     "viewAsClient": "View as Client",
     "viewAsProvider": "View as Provider"
+  },
+  "contentFilter": {
+    "blocked": "Your message contains inappropriate content. Please revise it."
+  },
+  "report": {
+    "title": "Report Content",
+    "description": "Help us keep the community safe by reporting inappropriate content.",
+    "reason": "Reason",
+    "selectReason": "Select a reason",
+    "reasons": {
+      "inappropriate": "Inappropriate content",
+      "harassment": "Harassment or bullying",
+      "spam": "Spam",
+      "hate": "Hate speech",
+      "violence": "Violence or threats",
+      "sexual": "Sexual content",
+      "fraud": "Fraud or scam",
+      "other": "Other"
+    },
+    "details": "Additional details",
+    "detailsPlaceholder": "Describe the issue...",
+    "submit": "Submit Report",
+    "success": "Report submitted successfully. We will review it within 24 hours.",
+    "reasonRequired": "Please select a reason for the report.",
+    "flagReview": "Report Review",
+    "reportProvider": "Report Provider",
+    "reportUser": "Report User"
+  },
+  "block": {
+    "block": "Block",
+    "unblock": "Unblock",
+    "blocked": "User blocked successfully.",
+    "unblocked": "User unblocked."
+  },
+  "adminReports": {
+    "title": "Reports & Moderation",
+    "subtitle": "Review and manage user reports",
+    "searchPlaceholder": "Search reports...",
+    "pending": "Pending",
+    "reviewed": "Reviewed",
+    "resolvedTab": "Resolved",
+    "noReports": "No reports found",
+    "statusPending": "Pending",
+    "statusReviewed": "Reviewed",
+    "statusResolved": "Resolved",
+    "statusDismissed": "Dismissed",
+    "targetType": {
+      "USER": "User",
+      "PROVIDER": "Provider",
+      "SERVICE": "Service",
+      "BOOKING": "Booking",
+      "MESSAGE": "Message",
+      "REVIEW": "Review"
+    },
+    "reportedBy": "Reported by",
+    "reportedUser": "Reported user",
+    "detailTitle": "Report Details",
+    "detailDescription": "Review the report and take action",
+    "reportedContent": "Reported content",
+    "date": "Date",
+    "adminNotes": "Admin notes",
+    "adminNotesPlaceholder": "Add notes about this report...",
+    "deleteContent": "Delete Content",
+    "dismiss": "Dismiss",
+    "resolve": "Resolve",
+    "resolved": "Report resolved successfully.",
+    "dismissed": "Report dismissed.",
+    "contentDeleted": "Content deleted successfully.",
+    "alreadyHandled": "This report has already been handled."
   }
 }

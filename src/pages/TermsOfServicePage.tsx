@@ -123,7 +123,24 @@ export default function TermsOfServicePage() {
         ],
       },
       {
-        title: "7. حدود المسؤولية",
+        title: "7. سياسة المحتوى الذي ينشئه المستخدم",
+        content:
+          "تلتزم لينك-22 بتوفير بيئة آمنة ومحترمة لجميع المستخدمين. ينطبق ما يلي على جميع المحتويات التي ينشئها المستخدمون بما في ذلك التقييمات والرسائل والصور والملفات الشخصية:",
+        bullets: [
+          "نتبع سياسة عدم تسامح مطلق مع المحتوى المسيء أو غير اللائق",
+          "يُحظر نشر محتوى يحض على الكراهية أو التمييز أو العنف أو التحرش أو أي مواد غير قانونية",
+          "يُحظر نشر محتوى جنسي صريح أو إباحي",
+          "يمكن للمستخدمين الإبلاغ عن أي محتوى مسيء مباشرة من التطبيق",
+          "يتم فحص جميع البلاغات خلال 24 ساعة واتخاذ الإجراء المناسب",
+          "يحق للمنصة إزالة أي محتوى ينتهك هذه السياسة دون إشعار مسبق",
+          "يحق للمنصة تعليق أو إنهاء حساب أي مستخدم ينشر محتوى مسيء",
+          "يمكن للمستخدمين حذف المحتوى الخاص بهم في أي وقت",
+          "يمكن للمستخدمين حظر المستخدمين المسيئين لمنعهم من التواصل معهم",
+          "للإبلاغ عن محتوى مسيء، يرجى التواصل عبر: 60azsazs@gmail.com",
+        ],
+      },
+      {
+        title: "8. حدود المسؤولية",
         content: "إخلاء المسؤولية:",
         bullets: [
           "نحن منصة وسيطة ولا نضمن جودة الخدمات",
@@ -133,7 +150,7 @@ export default function TermsOfServicePage() {
         ],
       },
       {
-        title: "8. إنهاء الحساب",
+        title: "9. إنهاء الحساب",
         content: "يحق لنا إنهاء أو تعليق حسابك في الحالات التالية:",
         bullets: [
           "انتهاك شروط الخدمة",
@@ -144,16 +161,16 @@ export default function TermsOfServicePage() {
         ],
       },
       {
-        title: "9. القانون الساري",
+        title: "10. القانون الساري",
         content:
           "تخضع هذه الشروط لأنظمة المملكة العربية السعودية. أي نزاعات تحل عبر الجهات المختصة في المملكة العربية السعودية.",
         bullets: [],
       },
       {
-        title: "10. التواصل معنا",
+        title: "11. التواصل معنا",
         content: "للاستفسارات حول شروط الخدمة:",
         bullets: [
-          "البريد الإلكتروني: azsazs112217@gmail.com",
+          "البريد الإلكتروني: 60azsazs@gmail.com",
           "الدعم الفني: متوفر داخل التطبيق",
         ],
       },
@@ -234,7 +251,24 @@ export default function TermsOfServicePage() {
         ],
       },
       {
-        title: "7. Limitation of Liability",
+        title: "7. User Generated Content Policy",
+        content:
+          "Link-22 is committed to providing a safe and respectful environment for all users. The following applies to all user-generated content including reviews, messages, photos, and profiles:",
+        bullets: [
+          "We maintain a zero-tolerance policy for objectionable or abusive content",
+          "Content that promotes hate, discrimination, violence, harassment, or any illegal material is strictly prohibited",
+          "Sexually explicit or pornographic content is strictly prohibited",
+          "Users can report objectionable content directly within the app",
+          "All reports are reviewed within 24 hours and appropriate action is taken",
+          "The platform reserves the right to remove any content that violates this policy without prior notice",
+          "The platform reserves the right to suspend or terminate the account of any user who posts objectionable content",
+          "Users can delete their own content at any time",
+          "Users can block abusive users to prevent further contact",
+          "To report objectionable content, please contact: 60azsazs@gmail.com",
+        ],
+      },
+      {
+        title: "8. Limitation of Liability",
         content: "Disclaimer:",
         bullets: [
           "We are an intermediary platform and do not guarantee service quality",
@@ -244,7 +278,7 @@ export default function TermsOfServicePage() {
         ],
       },
       {
-        title: "8. Account Termination",
+        title: "9. Account Termination",
         content:
           "We reserve the right to terminate or suspend your account in the following cases:",
         bullets: [
@@ -256,16 +290,16 @@ export default function TermsOfServicePage() {
         ],
       },
       {
-        title: "9. Governing Law",
+        title: "10. Governing Law",
         content:
           "These terms are governed by the laws of the Kingdom of Saudi Arabia. Any disputes shall be resolved through the competent authorities in Saudi Arabia.",
         bullets: [],
       },
       {
-        title: "10. Contact Us",
+        title: "11. Contact Us",
         content: "For inquiries about these terms of service:",
         bullets: [
-          "Email: azsazs112217@gmail.com",
+          "Email: 60azsazs@gmail.com",
           "Technical Support: Available within the app",
         ],
       },

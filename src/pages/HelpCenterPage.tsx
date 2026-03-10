@@ -15,6 +15,7 @@ const HelpCenterPage: React.FC = () => {
     "privacy",
     "safety",
     "messaging",
+    "reportContact",
   ] as const;
   const faqs = t("help.faqs", { returnObjects: true }) as Array<{
     q: string;

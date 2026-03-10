@@ -1,8 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Star, MessageSquare, User } from "lucide-react";
+import { ArrowLeft, Star, MessageSquare, User, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,6 +12,8 @@ import { StarRating } from "@/components/StarRating";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProviderReviews } from "@/hooks/queries/useReviews";
 import { useProviderProfile } from "@/hooks/queries/useProviders";
+import { ReportDialog } from "@/components/ReportDialog";
+import { Review } from "@/types";
 
 const ProviderReviewsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -21,6 +23,15 @@ const ProviderReviewsPage: React.FC = () => {
 
   const { data: reviews = [], isLoading } = useProviderReviews(user?.uid || "");
   const { data: profile } = useProviderProfile(user?.uid || "");
+
+  // Report dialog state
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reviewToReport, setReviewToReport] = useState<Review | null>(null);
+
+  const handleReportReview = (review: Review) => {
+    setReviewToReport(review);
+    setReportDialogOpen(true);
+  };
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -210,6 +221,17 @@ const ProviderReviewsPage: React.FC = () => {
                             <span className="ms-1">({t("review.edited")})</span>
                           )}
                         </p>
+
+                        {/* Report Button */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 text-muted-foreground hover:text-destructive gap-1 h-7 px-2"
+                          onClick={() => handleReportReview(review)}
+                        >
+                          <Flag className="h-3.5 w-3.5" />
+                          {t("report.flagReview")}
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -218,6 +240,21 @@ const ProviderReviewsPage: React.FC = () => {
             ))
           )}
         </motion.div>
+
+        {/* Report Dialog */}
+        {reviewToReport && (
+          <ReportDialog
+            open={reportDialogOpen}
+            onOpenChange={setReportDialogOpen}
+            targetType="REVIEW"
+            targetId={reviewToReport.id}
+            reporterId={user?.uid || ""}
+            reporterName={user?.name || user?.displayName}
+            targetOwnerId={reviewToReport.clientId}
+            targetOwnerName={reviewToReport.clientName}
+            targetContent={reviewToReport.comment}
+          />
+        )}
       </main>
     </div>
   );

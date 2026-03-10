@@ -30,6 +30,7 @@ import {
   useDeleteReview,
 } from "@/hooks/queries/useReviews";
 import { toast } from "sonner";
+import { isContentClean } from "@/lib/contentFilter";
 
 interface ReviewDialogProps {
   open: boolean;
@@ -80,6 +81,12 @@ export const ReviewDialog: React.FC<ReviewDialogProps> = ({
   const handleSubmit = async () => {
     if (rating === 0) {
       toast.error(t("review.ratingRequired"));
+      return;
+    }
+
+    // Content filter check
+    if (comment.trim() && !isContentClean(comment)) {
+      toast.error(t("contentFilter.blocked"));
       return;
     }
 

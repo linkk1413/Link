@@ -483,7 +483,7 @@ export default function PrivacyPolicyPage() {
                             ? "البريد الإلكتروني:"
                             : "Email:"}
                         </strong>{" "}
-                        support@link-22.com
+                        60azsazs@gmail.com
                       </p>
                       <p>
                         <strong>

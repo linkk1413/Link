@@ -34,7 +34,7 @@ const SignupPage: React.FC = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -47,8 +47,8 @@ const SignupPage: React.FC = () => {
     setError("");
     setSuccess("");
 
-    if (!acceptedPrivacy) {
-      setError(t("auth.acceptPrivacyRequired"));
+    if (!acceptedTerms) {
+      setError(t("auth.acceptTermsRequired"));
       return;
     }
 
@@ -61,8 +61,10 @@ const SignupPage: React.FC = () => {
     }
 
     // Normalize phone number to start with 05 (only if provided)
-    const normalizedPhone = cleanPhone 
-      ? (cleanPhone.startsWith("5") ? "0" + cleanPhone : cleanPhone)
+    const normalizedPhone = cleanPhone
+      ? cleanPhone.startsWith("5")
+        ? "0" + cleanPhone
+        : cleanPhone
       : "";
 
     if (!isStrongPassword(password)) {
@@ -195,7 +197,9 @@ const SignupPage: React.FC = () => {
             <div className="space-y-2">
               <Label htmlFor="phone">
                 {t("auth.phone")}
-                <span className="text-muted-foreground text-xs ms-1">({t("common.optional")})</span>
+                <span className="text-muted-foreground text-xs ms-1">
+                  ({t("common.optional")})
+                </span>
               </Label>
               <div className="relative">
                 <Phone className="absolute start-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
@@ -261,21 +265,32 @@ const SignupPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Privacy Policy Checkbox */}
+            {/* Terms & Privacy Checkbox */}
             <div className="flex items-start space-x-3 rtl:space-x-reverse">
               <Checkbox
-                id="privacy"
-                checked={acceptedPrivacy}
+                id="terms"
+                checked={acceptedTerms}
                 onCheckedChange={(checked) =>
-                  setAcceptedPrivacy(checked === true)
+                  setAcceptedTerms(checked === true)
                 }
                 className="mt-0.5"
               />
               <Label
-                htmlFor="privacy"
+                htmlFor="terms"
                 className="text-sm leading-relaxed cursor-pointer"
               >
                 {t("auth.iAccept")}{" "}
+                <Link
+                  to="/terms"
+                  className="text-primary hover:underline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/terms");
+                  }}
+                >
+                  {t("auth.termsOfService")}
+                </Link>{" "}
+                {t("common.and")}{" "}
                 <Link
                   to="/privacy"
                   className="text-primary hover:underline"
@@ -292,7 +307,7 @@ const SignupPage: React.FC = () => {
             <Button
               type="submit"
               className="w-full"
-              disabled={isLoading || !acceptedPrivacy}
+              disabled={isLoading || !acceptedTerms}
             >
               {isLoading ? (
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />

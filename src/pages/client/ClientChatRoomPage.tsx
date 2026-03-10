@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Send, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, Send, Image as ImageIcon, Flag, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +14,21 @@ import {
 } from "@/hooks/queries/useChats";
 import { useProviderProfile } from "@/hooks/queries/useProviders";
 import { Message } from "@/types";
+import { isContentClean } from "@/lib/contentFilter";
+import { toast } from "sonner";
+import { ReportDialog } from "@/components/ReportDialog";
+import {
+  useBlockUser,
+  useUnblockUser,
+  useIsUserBlocked,
+} from "@/hooks/queries/useBlocks";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreVertical } from "lucide-react";
 
 const ClientChatRoomPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -23,6 +38,7 @@ const ClientChatRoomPage: React.FC = () => {
   const isArabic = i18n.language === "ar";
 
   const [messageText, setMessageText] = useState("");
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Fetch data
@@ -33,6 +49,14 @@ const ClientChatRoomPage: React.FC = () => {
     chatId || "",
   );
   const sendMessageMutation = useSendMessage();
+
+  // Block hooks
+  const blockUserMutation = useBlockUser();
+  const unblockUserMutation = useUnblockUser();
+  const { data: isBlocked } = useIsUserBlocked(
+    user?.uid || "",
+    chat?.providerId || "",
+  );
 
   // Get provider name with fallbacks
   const providerName = chat?.providerName || providerProfile?.displayName || "";
@@ -46,8 +70,35 @@ const ClientChatRoomPage: React.FC = () => {
     navigate(-1);
   };
 
+  const handleBlock = async () => {
+    if (!user || !chat?.providerId) return;
+    try {
+      if (isBlocked) {
+        await unblockUserMutation.mutateAsync({
+          blockerId: user.uid,
+          blockedUserId: chat.providerId,
+        });
+        toast.success(t("block.unblocked"));
+      } else {
+        await blockUserMutation.mutateAsync({
+          blockerId: user.uid,
+          blockedUserId: chat.providerId,
+        });
+        toast.success(t("block.blocked"));
+      }
+    } catch (error) {
+      toast.error(t("common.error"));
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!messageText.trim() || !chatId || !user) return;
+
+    // Content filter check
+    if (!isContentClean(messageText)) {
+      toast.error(t("contentFilter.blocked"));
+      return;
+    }
 
     try {
       await sendMessageMutation.mutateAsync({
@@ -155,6 +206,29 @@ const ClientChatRoomPage: React.FC = () => {
               </h1>
             </div>
           </div>
+
+          <div className="ms-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => setReportDialogOpen(true)}
+                  className="text-destructive"
+                >
+                  <Flag className="h-4 w-4 me-2" />
+                  {t("report.reportUser")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleBlock}>
+                  <Ban className="h-4 w-4 me-2" />
+                  {isBlocked ? t("block.unblock") : t("block.block")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
 
@@ -261,6 +335,20 @@ const ClientChatRoomPage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Report Dialog */}
+      {user && chat && (
+        <ReportDialog
+          open={reportDialogOpen}
+          onOpenChange={setReportDialogOpen}
+          targetType="USER"
+          targetId={chat.providerId}
+          reporterId={user.uid}
+          reporterName={user.name || user.displayName}
+          targetOwnerId={chat.providerId}
+          targetOwnerName={providerName}
+        />
+      )}
     </div>
   );
 };

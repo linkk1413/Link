@@ -19,6 +19,7 @@ import {
   Moon,
   Star,
   Trash2,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -104,7 +105,8 @@ const ProviderProfilePage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { user, firebaseUser, logout, deleteAccount, refreshUser } = useAuth();
   const { isGuest } = useGuest();
-  const { requestTrackingConsent, consentStatus } = useRequestTrackingConsent();
+  const { requestTrackingConsent, revokeConsent, consentStatus } =
+    useRequestTrackingConsent();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const isArabic = i18n.language === "ar";
@@ -358,35 +360,6 @@ const ProviderProfilePage: React.FC = () => {
     ]);
     await refreshUser();
     setIsEditing(false);
-  };
-
-  const handleUseCurrentLocation = () => {
-    const doGetLocation = () => {
-      if (!navigator.geolocation) return;
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setFormValues((prev) => ({
-            ...prev,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          }));
-          toast.success(t("location.locationEnabled"));
-        },
-        () => {
-          toast.error(t("location.permissionDenied"));
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 600000 },
-      );
-    };
-
-    // Show tracking consent first if pending
-    if (consentStatus === "pending") {
-      requestTrackingConsent(() => {
-        doGetLocation();
-      });
-    } else {
-      doGetLocation();
-    }
   };
 
   const fadeInUp = {
@@ -664,23 +637,6 @@ const ProviderProfilePage: React.FC = () => {
                     className="mt-1 min-h-[100px]"
                   />
                 </div>
-
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleUseCurrentLocation}
-                    disabled={!isEditing}
-                  >
-                    {t("profile.useCurrentLocation")}
-                  </Button>
-                  {formValues.latitude && formValues.longitude && (
-                    <span className="text-xs text-muted-foreground">
-                      {t("profile.locationSaved")}
-                    </span>
-                  )}
-                </div>
               </CardContent>
             </Card>
           </motion.div>
@@ -836,6 +792,30 @@ const ProviderProfilePage: React.FC = () => {
                       {progressToTrusted}/10 {t("profile.bookingsCompleted")}
                     </span>
                   )}
+                </div>
+
+                {/* Location Access */}
+                <div className="flex items-center justify-between p-4 border-b">
+                  <div className="flex items-center gap-3">
+                    <MapPin className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex flex-col">
+                      <span>{t("profile.locationAccess")}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {t("profile.locationAccessDescription")}
+                      </span>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={consentStatus === "granted"}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        requestTrackingConsent();
+                      } else {
+                        revokeConsent();
+                        toast.success(t("profile.locationAccessRevoked"));
+                      }
+                    }}
+                  />
                 </div>
 
                 {/* Reset Password */}

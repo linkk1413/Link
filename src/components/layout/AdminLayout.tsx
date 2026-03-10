@@ -7,6 +7,7 @@ import {
   CreditCard,
   LayoutDashboard,
   Gift,
+  Flag,
   LogOut,
   Menu,
   X,
@@ -41,6 +42,11 @@ const adminNavItems = [
     path: "/admin/subscriptions",
     labelKey: "admin.nav.subscriptions",
     icon: <Gift className="h-5 w-5" />,
+  },
+  {
+    path: "/admin/reports",
+    labelKey: "admin.nav.reports",
+    icon: <Flag className="h-5 w-5" />,
   },
 ];
 
