@@ -69,9 +69,6 @@ export default function LandingPage() {
               alt="Link"
               className="h-10 w-10 rounded-lg object-cover"
             />
-            <span className="text-xl font-bold text-foreground">
-              {t("common.appName")}
-            </span>
           </div>
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
