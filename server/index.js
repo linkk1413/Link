@@ -84,7 +84,8 @@ const getAccessToken = async () => {
   return data.access_token;
 };
 
-app.post("/paypal/create-order", async (req, res) => {
+// Handler function for PayPal create order
+const handlePayPalCreateOrder = async (req, res) => {
   try {
     const { amountSar } = req.body;
     if (!amountSar) {
@@ -138,9 +139,10 @@ app.post("/paypal/create-order", async (req, res) => {
     console.error(error);
     return res.status(500).json({ error: "Failed to create order" });
   }
-});
+};
 
-app.post("/paypal/order-meta", async (req, res) => {
+// Handler function for PayPal order meta
+const handlePayPalOrderMeta = async (req, res) => {
   const { orderId } = req.body;
   if (!orderId) {
     return res.status(400).json({ error: "Missing orderId" });
@@ -152,7 +154,15 @@ app.post("/paypal/order-meta", async (req, res) => {
   }
 
   return res.json(meta);
-});
+};
+
+// Original endpoints
+app.post("/paypal/create-order", handlePayPalCreateOrder);
+app.post("/paypal/order-meta", handlePayPalOrderMeta);
+
+// Firebase Functions compatible endpoints (used by frontend)
+app.post("/paypalCreateOrder", handlePayPalCreateOrder);
+app.post("/paypalOrderMeta", handlePayPalOrderMeta);
 
 app.post("/paypal/capture-authorization", async (req, res) => {
   try {
