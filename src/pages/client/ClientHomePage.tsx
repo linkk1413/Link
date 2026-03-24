@@ -198,6 +198,36 @@ const ClientHomePage: React.FC = () => {
           animate="visible"
           variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
         >
+          {/* Become a Provider CTA - Only show if user is not already a provider and not a guest */}
+          {!isGuest && !user?.roles?.includes("PROVIDER") && (
+            <motion.section variants={fadeInUp} className="mb-6">
+              <button
+                onClick={() => navigate("/client/become-provider")}
+                className="w-full rounded-2xl bg-gradient-to-r from-primary to-primary/80 p-4 text-start text-primary-foreground transition-all hover:opacity-90"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20">
+                      <Briefcase className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold">
+                        {t("becomeProvider.ctaTitle", "Become a Provider")}
+                      </h3>
+                      <p className="text-sm opacity-90">
+                        {t(
+                          "becomeProvider.ctaSubtitle",
+                          "Start earning by offering your services",
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 rtl:rotate-180" />
+                </div>
+              </button>
+            </motion.section>
+          )}
+
           {/* Promotional Banner */}
           {banner?.isActive && (
             <motion.section variants={fadeInUp} className="mb-6">
@@ -470,35 +500,6 @@ const ClientHomePage: React.FC = () => {
             )}
           </motion.section>
 
-          {/* Become a Provider CTA - Only show if user is not already a provider and not a guest */}
-          {!isGuest && !user?.roles?.includes("PROVIDER") && (
-            <motion.section variants={fadeInUp} className="mt-8">
-              <button
-                onClick={() => navigate("/client/become-provider")}
-                className="w-full rounded-2xl bg-gradient-to-r from-primary to-primary/80 p-6 text-start text-primary-foreground transition-all hover:opacity-90"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/20">
-                      <Briefcase className="h-7 w-7" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold">
-                        {t("becomeProvider.ctaTitle", "Become a Provider")}
-                      </h3>
-                      <p className="text-sm opacity-90">
-                        {t(
-                          "becomeProvider.ctaSubtitle",
-                          "Start earning by offering your services",
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <ArrowRight className="h-6 w-6 rtl:rotate-180" />
-                </div>
-              </button>
-            </motion.section>
-          )}
         </motion.div>
       </main>
     </div>

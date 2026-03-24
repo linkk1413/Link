@@ -15,6 +15,8 @@ import {
   serverTimestamp,
   Timestamp,
   writeBatch,
+  QueryDocumentSnapshot,
+  DocumentData,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import {
@@ -125,7 +127,12 @@ export const createUserDocument = async (
 };
 
 // Check if phone number already exists
+// Check if phone number already exists (skip empty phone numbers)
 export const checkPhoneExists = async (phone: string): Promise<boolean> => {
+  // Don't check for empty phone numbers
+  if (!phone || phone.trim() === "") {
+    return false;
+  }
   const usersRef = collection(db, COLLECTIONS.USERS);
   const q = query(usersRef, where("phone", "==", phone), limit(1));
   const querySnapshot = await getDocs(q);
@@ -155,6 +162,16 @@ export const getUserDocument = async (uid: string): Promise<User | null> => {
     updateDoc(userRef, {
       roles,
       activeRole,
+      updatedAt: serverTimestamp(),
+    }).catch(console.error);
+  }
+
+  // Ensure providers always have CLIENT role for role switching
+  if (roles.includes("PROVIDER") && !roles.includes("CLIENT")) {
+    roles = ["CLIENT", ...roles];
+    // Update in background
+    updateDoc(userRef, {
+      roles,
       updatedAt: serverTimestamp(),
     }).catch(console.error);
   }
@@ -213,7 +230,12 @@ export const addRoleToUser = async (
   }
 
   const data = userSnap.data();
-  const currentRoles: UserRole[] = data.roles || [];
+  let currentRoles: UserRole[] = data.roles || [];
+
+  // Ensure CLIENT role exists when adding PROVIDER (for role switching)
+  if (newRole === "PROVIDER" && !currentRoles.includes("CLIENT")) {
+    currentRoles = [...currentRoles, "CLIENT"];
+  }
 
   // Only add if not already present
   if (!currentRoles.includes(newRole)) {
@@ -676,7 +698,7 @@ export const getProviderProfile = async (
         // Create a basic provider profile for existing providers
         // Note: user doc may have 'name' or 'displayName' field
         const userName =
-          (userDoc as any).name ||
+          userDoc.name ||
           userDoc.displayName ||
           userDoc.email?.split("@")[0] ||
           "Provider";
@@ -722,7 +744,7 @@ export const getProviderProfile = async (
       const userDoc = await getUserDocument(uid);
       // Note: user doc may have 'name' or 'displayName' field
       displayName =
-        (userDoc as any)?.name ||
+        userDoc?.name ||
         userDoc?.displayName ||
         userDoc?.email?.split("@")[0] ||
         "Provider";
@@ -900,7 +922,7 @@ export const verifySubscriptionPayment = async (
   }
 
   // Calculate new subscription end date based on plan
-  let endDate = new Date(now);
+  const endDate = new Date(now);
 
   // Map price to months: 10=1 month, 27=3 months, 96=12 months
   const priceToMonths: Record<number, number> = {
@@ -921,6 +943,8 @@ export const verifySubscriptionPayment = async (
     paymentVerificationStatus: "VERIFIED",
     paymentNotes: paymentData?.notes || "Payment verified by admin",
     accountStatus: "ACTIVE", // Unlock account if was locked
+    isSubscribed: true,
+    wasOnTrial: false, // Clear trial flag when subscription is activated
     // New payment tracking fields
     lastSubscriptionPaymentDate: paymentData?.date || now,
     lastSubscriptionPaymentAmount: paymentData?.amount || currentPrice,
@@ -946,6 +970,12 @@ export const updateSubscriptionStatus = async (
   if (startDate) updates.subscriptionStartDate = startDate;
   if (endDate) updates.subscriptionEndDate = endDate;
   if (price) updates.subscriptionPrice = price;
+
+  // Clear wasOnTrial when subscription becomes active
+  if (status === "ACTIVE") {
+    updates.wasOnTrial = false;
+    updates.isSubscribed = true;
+  }
 
   if (status === "CANCELLED") {
     updates.cancellationDate = new Date();
@@ -975,6 +1005,7 @@ export const checkAndExpireTrial = async (
       await updateDoc(providerRef, {
         subscriptionStatus: "EXPIRED",
         isSubscribed: false,
+        wasOnTrial: true, // Mark that this was a trial expiration
         updatedAt: serverTimestamp(),
       });
       return true; // Trial was expired
@@ -1271,7 +1302,9 @@ export interface FirestoreBooking extends Omit<
   updatedAt: Timestamp;
 }
 
-const convertFirestoreBooking = (doc: any): Booking => {
+const convertFirestoreBooking = (
+  doc: QueryDocumentSnapshot<DocumentData>,
+): Booking => {
   const data = doc.data() as FirestoreBooking;
   return {
     ...data,
@@ -1294,7 +1327,7 @@ export const getBookings = async (filters: {
 
     // Build query - note: composite indexes required for filter + orderBy
     // If no index exists, we'll catch the error and try without ordering
-    let constraints = [];
+    const constraints = [];
 
     if (filters.clientId) {
       constraints.push(where("clientId", "==", filters.clientId));
@@ -1491,8 +1524,35 @@ export const getReviews = async (providerId: string): Promise<Review[]> => {
 export const getReviewByBooking = async (
   bookingId: string,
 ): Promise<Review | null> => {
+  if (!bookingId) return null;
   const reviewsRef = collection(db, COLLECTIONS.REVIEWS);
   const q = query(reviewsRef, where("bookingId", "==", bookingId), limit(1));
+  const snapshot = await getDocs(q);
+
+  if (snapshot.empty) return null;
+
+  const doc = snapshot.docs[0];
+  const data = doc.data() as FirestoreReview;
+  return {
+    ...data,
+    id: doc.id,
+    createdAt: timestampToDate(data.createdAt),
+    updatedAt: data.updatedAt ? timestampToDate(data.updatedAt) : undefined,
+  };
+};
+
+// Get a review by client and provider (for open reviews without booking)
+export const getReviewByClientAndProvider = async (
+  clientId: string,
+  providerId: string,
+): Promise<Review | null> => {
+  const reviewsRef = collection(db, COLLECTIONS.REVIEWS);
+  const q = query(
+    reviewsRef,
+    where("clientId", "==", clientId),
+    where("providerId", "==", providerId),
+    limit(1)
+  );
   const snapshot = await getDocs(q);
 
   if (snapshot.empty) return null;
@@ -1562,8 +1622,18 @@ const updateProviderRating = async (providerId: string): Promise<void> => {
 export const createReview = async (
   review: Omit<Review, "id" | "createdAt">,
 ): Promise<string> => {
-  // Check if review already exists for this booking
-  const existingReview = await getReviewByBooking(review.bookingId);
+  // Check if review already exists
+  // For booking-based reviews, check by bookingId
+  // For open reviews (no booking), check by client+provider
+  let existingReview: Review | null = null;
+  
+  if (review.bookingId) {
+    existingReview = await getReviewByBooking(review.bookingId);
+  } else {
+    // Open review - check if client already reviewed this provider
+    existingReview = await getReviewByClientAndProvider(review.clientId, review.providerId);
+  }
+  
   if (existingReview) {
     // Review exists - return the existing ID instead of throwing
     // This handles the case where review was created but rating update failed
@@ -1891,7 +1961,7 @@ export const updateReportStatus = async (
   resolvedBy?: string,
 ): Promise<void> => {
   const docRef = doc(db, COLLECTIONS.REPORTS, reportId);
-  const updates: any = { status };
+  const updates: Record<string, unknown> = { status };
   if (adminNotes !== undefined) updates.adminNotes = adminNotes;
   if (status === "RESOLVED" || status === "DISMISSED") {
     updates.resolvedAt = serverTimestamp();

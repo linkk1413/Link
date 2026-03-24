@@ -18,7 +18,7 @@ import { useProviderProfile } from "@/hooks/queries/useProviders";
 import { useCreateBooking } from "@/hooks/queries/useBookings";
 import { useCreatePayment } from "@/hooks/queries/usePayments";
 import { useAuth } from "@/contexts/AuthContext";
-import MoyasarCheckout from "@/components/payments/MoyasarCheckout";
+import PayPalCheckout from "@/components/payments/PayPalCheckout";
 import { toast } from "@/components/ui/sonner";
 
 // Generate time slots
@@ -79,9 +79,11 @@ const BookingPage: React.FC = () => {
     setShowConfirmation(true);
   };
 
-  const handleMoyasarPaymentSuccess = async (payload: {
-    paymentId: string;
-    status: string;
+  const handlePayPalAuthorized = async (payload: {
+    orderId: string;
+    authorizationId: string;
+    amountUsd: number;
+    fxRate: number;
   }) => {
     if (
       !service ||
@@ -131,12 +133,15 @@ const BookingPage: React.FC = () => {
         clientId: user.uid,
         providerId: service.providerId,
         payType: "FULL",
-        status: "CAPTURED",
-        gateway: "MOYASAR",
+        status: "AUTHORIZED",
+        gateway: "PAYPAL",
         amount: service.price,
         currency: "SAR",
         amountSar: service.price,
-        orderId: payload.paymentId,
+        amountUsd: payload.amountUsd,
+        fxRate: payload.fxRate,
+        orderId: payload.orderId,
+        authorizationId: payload.authorizationId,
         platformFee: 0,
         gatewayFee: 0,
         providerAmount: service.price,
@@ -423,14 +428,14 @@ const BookingPage: React.FC = () => {
                   </div>
                 )}
 
-                <MoyasarCheckout
+                <PayPalCheckout
                   amount={service.price}
-                  onSuccess={handleMoyasarPaymentSuccess}
-                  onError={(message) => setPaymentError(message)}
-                  metadata={{
+                  bookingMeta={{
                     serviceId: service.id,
                     providerId: service.providerId,
                   }}
+                  onAuthorized={handlePayPalAuthorized}
+                  onError={(message) => setPaymentError(message)}
                 />
 
                 <Button

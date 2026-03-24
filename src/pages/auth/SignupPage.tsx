@@ -52,20 +52,22 @@ const SignupPage: React.FC = () => {
       return;
     }
 
-    // Validate phone number (Saudi format) - only if provided
+    // Validate phone number (Saudi format) - required
     const phoneRegex = /^(05|5)\d{8}$/;
     const cleanPhone = phone.replace(/\s/g, "");
-    if (cleanPhone && !phoneRegex.test(cleanPhone)) {
+    if (!cleanPhone) {
+      setError(t("auth.phoneRequired"));
+      return;
+    }
+    if (!phoneRegex.test(cleanPhone)) {
       setError(t("auth.invalidPhone"));
       return;
     }
 
-    // Normalize phone number to start with 05 (only if provided)
-    const normalizedPhone = cleanPhone
-      ? cleanPhone.startsWith("5")
-        ? "0" + cleanPhone
-        : cleanPhone
-      : "";
+    // Normalize phone number to start with 05
+    const normalizedPhone = cleanPhone.startsWith("5")
+      ? "0" + cleanPhone
+      : cleanPhone;
 
     if (!isStrongPassword(password)) {
       setError(t("auth.passwordRequirements"));
@@ -83,7 +85,7 @@ const SignupPage: React.FC = () => {
       await signup(email, password, name, normalizedPhone);
       navigate("/onboarding");
     } catch (err) {
-      if ((err as any)?.code === "auth/email-not-verified") {
+      if ((err as { code?: string })?.code === "auth/email-not-verified") {
         setSuccess(t("auth.verifyEmailSent"));
         navigate("/auth/login");
         return;
@@ -195,12 +197,7 @@ const SignupPage: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">
-                {t("auth.phone")}
-                <span className="text-muted-foreground text-xs ms-1">
-                  ({t("common.optional")})
-                </span>
-              </Label>
+              <Label htmlFor="phone">{t("auth.phone")}</Label>
               <div className="relative">
                 <Phone className="absolute start-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -211,6 +208,7 @@ const SignupPage: React.FC = () => {
                   placeholder="05XXXXXXXX"
                   className="ps-10"
                   dir="ltr"
+                  required
                 />
               </div>
             </div>

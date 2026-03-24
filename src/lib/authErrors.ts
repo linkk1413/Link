@@ -2,10 +2,10 @@
 // Maps Firebase error codes to translation keys or default messages
 
 export const getAuthErrorMessage = (
-  error: any,
+  error: unknown,
   t: (key: string) => string,
 ): string => {
-  const errorCode = error?.code || "";
+  const errorCode = (error as { code?: string })?.code || "";
 
   switch (errorCode) {
     // Sign up errors

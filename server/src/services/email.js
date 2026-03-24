@@ -1,9 +1,16 @@
 const { Resend } = require("resend");
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Make Resend optional - server can run without email functionality
+const resendApiKey = process.env.RESEND_API_KEY;
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
 const senderEmail = process.env.SENDER_EMAIL || "noreply@link-22.com";
 
 const sendEmail = async (params) => {
+  if (!resend) {
+    console.warn("Email service not configured (RESEND_API_KEY missing). Email not sent.");
+    return { data: { id: "skipped" }, error: null };
+  }
+  
   try {
     const result = await resend.emails.send({
       from: senderEmail,

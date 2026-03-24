@@ -157,14 +157,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       fbUser = userCredential.user;
 
       // Now check if phone number already exists (after auth, so we have permissions)
-      const phoneExists = await checkPhoneExists(phone);
-      if (phoneExists) {
-        // Phone already exists - delete the just-created auth user and throw error
-        await fbUser.delete();
-        throw {
-          code: "auth/phone-already-in-use",
-          message: "Phone number already in use",
-        };
+      // Only check if phone is provided and not empty
+      if (phone && phone.trim() !== "") {
+        const phoneExists = await checkPhoneExists(phone);
+        if (phoneExists) {
+          // Phone already exists - delete the just-created auth user and throw error
+          await fbUser.delete();
+          throw {
+            code: "auth/phone-already-in-use",
+            message: "Phone number already in use",
+          };
+        }
       }
 
       // Attempt to send email verification
@@ -199,10 +202,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Create user document in Firestore
       const newUser = await createUserDocument(fbUser.uid, email, name, phone);
       setUser(newUser);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Signup error:", error);
       // If we created an auth user but something else failed, clean up
-      if (fbUser && error?.code !== "auth/phone-already-in-use") {
+      const errorCode = (error as { code?: string })?.code;
+      if (fbUser && errorCode !== "auth/phone-already-in-use") {
         try {
           await fbUser.delete();
         } catch (deleteError) {

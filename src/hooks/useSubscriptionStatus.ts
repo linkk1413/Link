@@ -8,6 +8,7 @@ interface SubscriptionStatus {
   isLocked: boolean;
   isExpired: boolean;
   isTrial: boolean;
+  isTrialExpired: boolean; // Trial specifically expired (not regular subscription)
   trialDaysRemaining: number;
   daysUntilExpiry: number;
   profile: ProviderProfile | null;
@@ -26,10 +27,12 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
     isLoading,
     refetch,
   } = useProviderProfile(user?.uid || "");
+  const [trialJustExpired, setTrialJustExpired] = useState(false);
   const [status, setStatus] = useState<SubscriptionStatus>({
     isLocked: false,
     isExpired: false,
     isTrial: false,
+    isTrialExpired: false,
     trialDaysRemaining: 0,
     daysUntilExpiry: -1,
     profile: null,
@@ -42,6 +45,8 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
       if (profile?.subscriptionStatus === "TRIAL" && user?.uid) {
         const wasExpired = await checkAndExpireTrial(user.uid);
         if (wasExpired) {
+          // Mark that trial just expired
+          setTrialJustExpired(true);
           // Refetch profile to get updated status
           refetch();
         }
@@ -56,6 +61,7 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
         isLocked: false,
         isExpired: false,
         isTrial: false,
+        isTrialExpired: false,
         trialDaysRemaining: 0,
         daysUntilExpiry: -1,
         profile: null,
@@ -72,20 +78,29 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
       profile.subscriptionStatus === "EXPIRED" ||
       profile.subscriptionStatus === "CANCELLED";
 
+    // Check if trial just expired (either just detected or profile shows it was a trial)
+    // We check wasOnTrial from profile if available, or use local state
+    const isTrialExpired = trialJustExpired || (isExpired && profile.wasOnTrial === true);
+
     let daysUntilExpiry = -1;
     let trialDaysRemaining = 0;
     if (profile.subscriptionEndDate) {
       const today = new Date();
       // Handle Firestore Timestamp or regular Date
       let endDate: Date;
-      const rawDate = profile.subscriptionEndDate as any;
-      if (rawDate?.toDate && typeof rawDate.toDate === "function") {
+      const rawDate = profile.subscriptionEndDate as { toDate?: () => Date } | Date | string;
+      if (
+        rawDate &&
+        typeof rawDate === "object" &&
+        "toDate" in rawDate &&
+        typeof rawDate.toDate === "function"
+      ) {
         // Firestore Timestamp
         endDate = rawDate.toDate();
       } else if (rawDate instanceof Date) {
         endDate = rawDate;
       } else {
-        endDate = new Date(rawDate);
+        endDate = new Date(rawDate as string);
       }
 
       daysUntilExpiry = Math.ceil(
@@ -102,12 +117,13 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
       isLocked,
       isExpired,
       isTrial,
+      isTrialExpired,
       trialDaysRemaining,
       daysUntilExpiry,
       profile,
       isLoading,
     });
-  }, [profile, isLoading]);
+  }, [profile, isLoading, trialJustExpired]);
 
   return status;
 };

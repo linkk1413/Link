@@ -35,7 +35,7 @@ import { isContentClean } from "@/lib/contentFilter";
 interface ReviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  bookingId: string;
+  bookingId?: string; // Optional - not required for open reviews
   clientId: string;
   clientName?: string;
   providerId: string;
@@ -97,6 +97,7 @@ export const ReviewDialog: React.FC<ReviewDialogProps> = ({
           updates: { rating, comment: comment.trim() || undefined },
           providerId,
           bookingId,
+          clientId,
         });
         toast.success(t("review.updateSuccess"));
       } else {
@@ -128,6 +129,7 @@ export const ReviewDialog: React.FC<ReviewDialogProps> = ({
         reviewId: existingReview.id,
         providerId,
         bookingId,
+        clientId,
       });
       toast.success(t("review.deleteSuccess"));
       setDeleteDialogOpen(false);

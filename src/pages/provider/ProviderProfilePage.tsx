@@ -286,10 +286,10 @@ const ProviderProfilePage: React.FC = () => {
       setDeleteAccountDialogOpen(false);
       setDeletePassword("");
       navigate("/");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to delete account:", error);
       // Handle wrong password error
-      const errorCode = error?.code || error?.message || "";
+      const errorCode = (error as { code?: string; message?: string })?.code || (error as { code?: string; message?: string })?.message || "";
       if (
         errorCode.includes("wrong-password") ||
         errorCode.includes("invalid-credential") ||

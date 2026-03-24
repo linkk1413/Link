@@ -118,7 +118,7 @@ const AdminVerificationsPage: React.FC = () => {
 
       // Update verification status
       const verificationRef = doc(db, "verifications", selectedRequest.id);
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         status: actionType === "approve" ? "APPROVED" : "REJECTED",
         updatedAt: new Date(),
         updatedBy: user?.uid,

@@ -17,9 +17,25 @@ type PayPalCheckoutProps = {
   onError?: (message: string) => void;
 };
 
+// PayPal SDK type - external library without TypeScript definitions
+interface PayPalSDK {
+  Buttons: (config: {
+    style?: Record<string, string>;
+    createOrder?: () => Promise<string>;
+    onApprove?: (
+      data: unknown,
+      actions: { order: { authorize: () => Promise<unknown> } },
+    ) => Promise<void>;
+    onError?: (err: unknown) => void;
+  }) => {
+    render: (container: HTMLElement) => Promise<void>;
+    close?: () => void;
+  };
+}
+
 declare global {
   interface Window {
-    paypal?: any;
+    paypal?: PayPalSDK;
   }
 }
 
@@ -41,7 +57,8 @@ const loadPayPalScript = (clientId: string, currency: string) =>
 
     const script = document.createElement("script");
     script.id = PAYPAL_SDK_ID;
-    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&intent=authorize&currency=${currency}`;
+    // Card-only: disable PayPal, Venmo, PayLater; enable only card funding
+    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&intent=authorize&currency=${currency}&disable-funding=venmo,paypal,paylater,credit&enable-funding=card`;
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject();
@@ -56,7 +73,7 @@ const PayPalCheckout: React.FC<PayPalCheckoutProps> = ({
   onError,
 }) => {
   const buttonRef = useRef<HTMLDivElement | null>(null);
-  const buttonsInstanceRef = useRef<any>(null);
+  const buttonsInstanceRef = useRef<{ close?: () => void } | null>(null);
   const renderKeyRef = useRef<string>("");
   const renderingRef = useRef(false);
   const apiBaseUrl = import.meta.env.VITE_PAYPAL_API_BASE_URL as
@@ -111,8 +128,10 @@ const PayPalCheckout: React.FC<PayPalCheckoutProps> = ({
       style: {
         layout: "vertical",
         shape: "pill",
-        label: "paypal",
+        label: "pay",
+        color: "black",
       },
+      fundingSource: "card" as unknown as undefined, // Force card-only display
       createOrder: async () => {
         const response = await fetch(`${apiBaseUrl}/paypal/create-order`, {
           method: "POST",
@@ -142,7 +161,17 @@ const PayPalCheckout: React.FC<PayPalCheckoutProps> = ({
 
         return data.orderId;
       },
-      onApprove: async (_data: any, actions: any) => {
+      onApprove: async (
+        _data: unknown,
+        actions: { order: { authorize: () => Promise<{
+          id?: string;
+          purchase_units?: Array<{
+            payments?: {
+              authorizations?: Array<{ id?: string }>;
+            };
+          }>;
+        }> } },
+      ) => {
         try {
           const authorization = await actions.order.authorize();
           const authorizationId =

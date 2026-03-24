@@ -14,6 +14,7 @@ import {
   Flag,
   Ban,
   MoreVertical,
+  Edit,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useProviderProfile, useProviderServices } from "@/hooks/queries";
-import { useReviews } from "@/hooks/queries/useReviews";
+import { useReviews, useClientProviderReview } from "@/hooks/queries/useReviews";
 import { useCreateChat } from "@/hooks/queries/useChats";
 import {
   useBlockUser,
@@ -42,6 +43,7 @@ import {
 } from "@/hooks/useGeolocation";
 import { Service } from "@/types";
 import { ReportDialog } from "@/components/ReportDialog";
+import { ReviewDialog } from "@/components/ReviewDialog";
 import { toast } from "sonner";
 
 const ProviderProfilePage: React.FC = () => {
@@ -53,6 +55,7 @@ const ProviderProfilePage: React.FC = () => {
 
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
 
   // Geolocation for distance calculation
   const { location, requestLocation } = useGeolocation();
@@ -74,6 +77,12 @@ const ProviderProfilePage: React.FC = () => {
   const { data: reviews = [], isLoading: loadingReviews } = useReviews({
     providerId: id,
   });
+  
+  // Check if current user has already reviewed this provider
+  const { data: existingReview } = useClientProviderReview(
+    user?.uid || "",
+    id || ""
+  );
 
   // Calculate distance to provider (must be after provider is fetched)
   const distanceToProvider = React.useMemo(() => {
@@ -335,6 +344,29 @@ const ProviderProfilePage: React.FC = () => {
 
             {/* Reviews Tab */}
             <TabsContent value="reviews" className="mt-4">
+              {/* Leave Review Button - Show for logged in clients */}
+              {user && user.uid !== id && (
+                <div className="mb-4">
+                  <Button
+                    onClick={() => setReviewDialogOpen(true)}
+                    className="w-full gap-2"
+                    variant={existingReview ? "outline" : "default"}
+                  >
+                    {existingReview ? (
+                      <>
+                        <Edit className="h-4 w-4" />
+                        {t("review.editReview")}
+                      </>
+                    ) : (
+                      <>
+                        <Star className="h-4 w-4" />
+                        {t("review.leaveReview")}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+              
               {loadingReviews ? (
                 <div className="space-y-4">
                   {[1, 2].map((i) => (
@@ -463,6 +495,18 @@ const ProviderProfilePage: React.FC = () => {
           reporterName={user.name || user.displayName}
           targetOwnerId={id}
           targetOwnerName={provider?.displayName}
+        />
+      )}
+
+      {/* Review Dialog */}
+      {user && id && (
+        <ReviewDialog
+          open={reviewDialogOpen}
+          onOpenChange={setReviewDialogOpen}
+          clientId={user.uid}
+          clientName={user.name || user.displayName}
+          providerId={id}
+          existingReview={existingReview}
         />
       )}
     </div>

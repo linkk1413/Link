@@ -9,8 +9,17 @@ import {
   getUserDocument,
   createProviderProfile,
 } from "./lib/firestore";
-(window as any).fixProviderDisplayName = fixProviderDisplayName;
-(window as any).getUserDocument = getUserDocument;
-(window as any).createProviderProfile = createProviderProfile;
+
+declare global {
+  interface Window {
+    fixProviderDisplayName?: typeof fixProviderDisplayName;
+    getUserDocument?: typeof getUserDocument;
+    createProviderProfile?: typeof createProviderProfile;
+  }
+}
+
+window.fixProviderDisplayName = fixProviderDisplayName;
+window.getUserDocument = getUserDocument;
+window.createProviderProfile = createProviderProfile;
 
 createRoot(document.getElementById("root")!).render(<App />);

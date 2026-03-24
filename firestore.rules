@@ -39,7 +39,10 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if signedIn() && (userId == request.auth.uid || isAdmin());
+      // Allow get for own document or admin
+      allow get: if signedIn() && (userId == request.auth.uid || isAdmin());
+      // Allow list/query for authenticated users (needed for phone uniqueness check)
+      allow list: if signedIn();
       allow create: if signedIn() && userId == request.auth.uid;
       allow update: if signedIn() && (userId == request.auth.uid || isAdmin());
       allow delete: if isAdmin();

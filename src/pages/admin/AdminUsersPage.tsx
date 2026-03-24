@@ -115,7 +115,7 @@ const AdminUsersPage: React.FC = () => {
 
       const matchesRole =
         roleFilter === "ALL" ||
-        user.roles?.includes(roleFilter as any) ||
+        user.roles?.includes(roleFilter as UserRole) ||
         user.role === roleFilter;
       const matchesStatus =
         statusFilter === "ALL" || user.status === statusFilter;

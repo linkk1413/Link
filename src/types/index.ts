@@ -106,6 +106,7 @@ export interface ProviderProfile {
   subscriptionPrice?: number;
   autoRenew?: boolean;
   cancellationDate?: Date;
+  wasOnTrial?: boolean; // Marks if subscription expired from a trial
   accountStatus: "ACTIVE" | "LOCKED" | "SUSPENDED";
   // Payment verification fields
   lastPaymentDate?: Date;
@@ -257,7 +258,7 @@ export interface Message {
 // Review
 export interface Review {
   id: string;
-  bookingId: string;
+  bookingId?: string; // Optional - reviews can be left without a booking
   clientId: string;
   clientName?: string; // For display purposes
   providerId: string;

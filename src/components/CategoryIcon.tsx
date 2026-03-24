@@ -80,6 +80,7 @@ export const CategoryIcon = ({
   }
 
   // If not found in map, check if it's an emoji (has non-ASCII characters)
+  // eslint-disable-next-line no-control-regex
   if (/[^\x00-\x7F]/.test(icon)) {
     return <span className={className}>{icon}</span>;
   }

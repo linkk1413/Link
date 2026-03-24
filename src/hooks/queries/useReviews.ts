@@ -4,6 +4,7 @@ import {
   getReviews,
   getReviewByBooking,
   getReviewById,
+  getReviewByClientAndProvider,
   createReview,
   updateReview,
   deleteReview,
@@ -18,6 +19,8 @@ export const reviewKeys = {
     ["reviews", "provider", providerId] as const,
   byService: (serviceId: string) => ["reviews", "service", serviceId] as const,
   byBooking: (bookingId: string) => ["reviews", "booking", bookingId] as const,
+  byClientProvider: (clientId: string, providerId: string) =>
+    ["reviews", "clientProvider", clientId, providerId] as const,
   detail: (reviewId: string) => ["reviews", "detail", reviewId] as const,
 };
 
@@ -52,6 +55,15 @@ export const useReviewByBooking = (bookingId: string) => {
   });
 };
 
+// Fetch review by client and provider (for open reviews)
+export const useClientProviderReview = (clientId: string, providerId: string) => {
+  return useQuery<Review | null, Error>({
+    queryKey: reviewKeys.byClientProvider(clientId, providerId),
+    queryFn: () => getReviewByClientAndProvider(clientId, providerId),
+    enabled: !!clientId && !!providerId,
+  });
+};
+
 // Fetch review by ID
 export const useReviewById = (reviewId: string) => {
   return useQuery<Review | null, Error>({
@@ -73,9 +85,15 @@ export const useCreateReview = () => {
       queryClient.invalidateQueries({
         queryKey: reviewKeys.byProvider(variables.providerId),
       });
-      // Invalidate booking review check
+      // Invalidate booking review check if booking exists
+      if (variables.bookingId) {
+        queryClient.invalidateQueries({
+          queryKey: reviewKeys.byBooking(variables.bookingId),
+        });
+      }
+      // Invalidate client-provider review check
       queryClient.invalidateQueries({
-        queryKey: reviewKeys.byBooking(variables.bookingId),
+        queryKey: reviewKeys.byClientProvider(variables.clientId, variables.providerId),
       });
       // Also invalidate provider profile to update rating
       queryClient.invalidateQueries({
@@ -99,11 +117,13 @@ export const useUpdateReview = () => {
       updates,
       providerId,
       bookingId,
+      clientId,
     }: {
       reviewId: string;
       updates: { rating?: number; comment?: string };
       providerId: string;
-      bookingId: string;
+      bookingId?: string;
+      clientId?: string;
     }) => updateReview(reviewId, updates),
     onSuccess: (_, variables) => {
       // Invalidate review detail
@@ -114,10 +134,18 @@ export const useUpdateReview = () => {
       queryClient.invalidateQueries({
         queryKey: reviewKeys.byProvider(variables.providerId),
       });
-      // Invalidate booking review
-      queryClient.invalidateQueries({
-        queryKey: reviewKeys.byBooking(variables.bookingId),
-      });
+      // Invalidate booking review if exists
+      if (variables.bookingId) {
+        queryClient.invalidateQueries({
+          queryKey: reviewKeys.byBooking(variables.bookingId),
+        });
+      }
+      // Invalidate client-provider review if clientId provided
+      if (variables.clientId) {
+        queryClient.invalidateQueries({
+          queryKey: reviewKeys.byClientProvider(variables.clientId, variables.providerId),
+        });
+      }
       // Invalidate provider profile to update rating
       queryClient.invalidateQueries({
         queryKey: providerKeys.detail(variables.providerId),
@@ -139,10 +167,12 @@ export const useDeleteReview = () => {
       reviewId,
       providerId,
       bookingId,
+      clientId,
     }: {
       reviewId: string;
       providerId: string;
-      bookingId: string;
+      bookingId?: string;
+      clientId?: string;
     }) => deleteReview(reviewId),
     onSuccess: (_, variables) => {
       // Invalidate review detail
@@ -153,10 +183,18 @@ export const useDeleteReview = () => {
       queryClient.invalidateQueries({
         queryKey: reviewKeys.byProvider(variables.providerId),
       });
-      // Invalidate booking review check
-      queryClient.invalidateQueries({
-        queryKey: reviewKeys.byBooking(variables.bookingId),
-      });
+      // Invalidate booking review check if exists
+      if (variables.bookingId) {
+        queryClient.invalidateQueries({
+          queryKey: reviewKeys.byBooking(variables.bookingId),
+        });
+      }
+      // Invalidate client-provider review if clientId provided
+      if (variables.clientId) {
+        queryClient.invalidateQueries({
+          queryKey: reviewKeys.byClientProvider(variables.clientId, variables.providerId),
+        });
+      }
       // Invalidate provider profile to update rating
       queryClient.invalidateQueries({
         queryKey: providerKeys.detail(variables.providerId),

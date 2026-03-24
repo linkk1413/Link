@@ -1,6 +1,6 @@
 // React Query hooks for Payments
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, where, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import { createPayment, updatePayment, timestampToDate } from "@/lib/firestore";
 import { db } from "@/lib/firebase";
 import { Payment } from "@/types";
@@ -16,12 +16,12 @@ interface FirestorePayment extends Omit<Payment, "createdAt"> {
   createdAt: { toDate?: () => Date } | null;
 }
 
-const mapPayment = (doc: any): Payment => {
+const mapPayment = (doc: QueryDocumentSnapshot<DocumentData>): Payment => {
   const data = doc.data() as FirestorePayment;
   return {
     ...data,
     id: doc.id,
-    createdAt: timestampToDate((data.createdAt as any) || null),
+    createdAt: timestampToDate(data.createdAt || null),
   } as Payment;
 };
 

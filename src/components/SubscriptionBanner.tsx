@@ -15,14 +15,14 @@ export const SubscriptionBanner: React.FC<SubscriptionBannerProps> = ({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [isDismissed, setIsDismissed] = React.useState(false);
-  const { isLocked, isExpired, isTrial, daysUntilExpiry } =
+  const { isLocked, isExpired, isTrial, isTrialExpired, daysUntilExpiry } =
     useSubscriptionStatus();
 
   // Don't show banner if dismissed, in trial, or subscription is fine (>7 days left)
   if (
     isDismissed ||
     isTrial ||
-    (!isLocked && !isExpired && daysUntilExpiry > 7)
+    (!isLocked && !isExpired && !isTrialExpired && daysUntilExpiry > 7)
   ) {
     return null;
   }
@@ -47,6 +47,35 @@ export const SubscriptionBanner: React.FC<SubscriptionBannerProps> = ({
             variant="outline"
             onClick={() => navigate("/provider/subscription")}
             className="border-red-300 text-red-900 hover:bg-red-100 dark:border-red-700 dark:text-red-100 dark:hover:bg-red-900/40"
+          >
+            {t("provider.subscribeNow")}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Trial expired - show specific message
+  if (isTrialExpired) {
+    return (
+      <div className="border-b border-amber-200 bg-amber-50 px-4 py-4 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-100">
+        <div className="container flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <Clock className="mt-0.5 h-5 w-5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold">
+                {t("provider.trialExpiredTitle")}
+              </p>
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                {t("provider.trialExpiredMessage")}
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => navigate("/provider/subscription")}
+            className="border-amber-300 text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900/40"
           >
             {t("provider.subscribeNow")}
           </Button>

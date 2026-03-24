@@ -50,14 +50,14 @@ export const chatKeys = {
 };
 
 // Helper to convert Firestore timestamps
-const convertTimestamp = (timestamp: any): Date => {
+const convertTimestamp = (timestamp: unknown): Date => {
   if (timestamp instanceof Timestamp) {
     return timestamp.toDate();
   }
-  if (timestamp?.toDate) {
-    return timestamp.toDate();
+  if ((timestamp as { toDate?: () => Date })?.toDate) {
+    return (timestamp as { toDate: () => Date }).toDate();
   }
-  return new Date(timestamp);
+  return new Date(timestamp as string | number | Date);
 };
 
 // Fetch chats for a client
