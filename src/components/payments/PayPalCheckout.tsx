@@ -83,9 +83,9 @@ const PayPalCheckout: React.FC<PayPalCheckoutProps> = ({
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID as
-      | string
-      | undefined;
+    // PayPal Client ID (public key - safe to expose in client code)
+    const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || 
+      "AWkGBizXAEAdUwUnBMn9I0uinN9MHMm8nT4-TfER-q22tcJIa5YQdMLbNP8t_pGkexK5eeLvnto0Rj3s";
     if (!clientId || !apiBaseUrl) {
       onError?.("Missing PayPal configuration.");
       return;
