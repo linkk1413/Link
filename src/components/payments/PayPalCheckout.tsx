@@ -76,9 +76,10 @@ const PayPalCheckout: React.FC<PayPalCheckoutProps> = ({
   const buttonsInstanceRef = useRef<{ close?: () => void } | null>(null);
   const renderKeyRef = useRef<string>("");
   const renderingRef = useRef(false);
-  const apiBaseUrl = import.meta.env.VITE_PAYPAL_API_BASE_URL as
-    | string
-    | undefined;
+  
+  // Firebase Functions base URL (auto-detect region)
+  const apiBaseUrl = import.meta.env.VITE_PAYPAL_API_BASE_URL || 
+    "https://us-central1-link-e843b.cloudfunctions.net";
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -133,7 +134,7 @@ const PayPalCheckout: React.FC<PayPalCheckoutProps> = ({
       },
       fundingSource: "card" as unknown as undefined, // Force card-only display
       createOrder: async () => {
-        const response = await fetch(`${apiBaseUrl}/paypal/create-order`, {
+        const response = await fetch(`${apiBaseUrl}/paypalCreateOrder`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -183,7 +184,7 @@ const PayPalCheckout: React.FC<PayPalCheckoutProps> = ({
             throw new Error("Missing authorization id");
           }
 
-          const response = await fetch(`${apiBaseUrl}/paypal/order-meta`, {
+          const response = await fetch(`${apiBaseUrl}/paypalOrderMeta`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ orderId }),
