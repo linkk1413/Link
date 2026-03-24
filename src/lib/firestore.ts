@@ -213,6 +213,7 @@ export const switchActiveRole = async (
   const userRef = doc(db, COLLECTIONS.USERS, uid);
   await updateDoc(userRef, {
     activeRole: role,
+    role: role, // Also update legacy role field for Firestore rules compatibility
     updatedAt: serverTimestamp(),
   });
 };
@@ -242,6 +243,7 @@ export const addRoleToUser = async (
     await updateDoc(userRef, {
       roles: [...currentRoles, newRole],
       activeRole: newRole, // Switch to new role
+      role: newRole, // Also update legacy role field for Firestore rules compatibility
       updatedAt: serverTimestamp(),
     });
   }
@@ -1207,24 +1209,35 @@ export const getServices = async (filters?: {
       };
     });
 
-    // Filter out services from locked providers (don't show to clients)
+    // Filter out services from locked or expired subscription providers (don't show to clients)
     // If filtering by specific provider ID, skip this check (provider sees own services)
     if (!filters?.providerId) {
-      const lockedServiceIds = new Set<string>();
+      const hiddenServiceIds = new Set<string>();
 
-      // Fetch provider profiles to check account status
+      // Fetch provider profiles to check account and subscription status
       for (const service of services) {
         try {
           const providerProfile = await getProviderProfile(service.providerId);
-          if (providerProfile?.accountStatus === "LOCKED") {
-            lockedServiceIds.add(service.id);
+          if (providerProfile) {
+            // Hide if account is locked
+            if (providerProfile.accountStatus === "LOCKED") {
+              hiddenServiceIds.add(service.id);
+            }
+            // Hide if subscription expired (not in trial or active subscription)
+            if (
+              providerProfile.subscriptionStatus === "EXPIRED" ||
+              providerProfile.subscriptionStatus === "CANCELLED" ||
+              !providerProfile.subscriptionStatus
+            ) {
+              hiddenServiceIds.add(service.id);
+            }
           }
         } catch (error) {
           // Silent fail - if we can't fetch profile, include the service
         }
       }
 
-      return services.filter((s) => !lockedServiceIds.has(s.id));
+      return services.filter((s) => !hiddenServiceIds.has(s.id));
     }
 
     return services;
@@ -1494,10 +1507,11 @@ export const updatePayment = async (
 
 export interface FirestoreReview extends Omit<
   Review,
-  "createdAt" | "updatedAt"
+  "createdAt" | "updatedAt" | "providerReplyAt"
 > {
   createdAt: Timestamp;
   updatedAt?: Timestamp;
+  providerReplyAt?: Timestamp;
 }
 
 export const getReviews = async (providerId: string): Promise<Review[]> => {
@@ -1513,6 +1527,7 @@ export const getReviews = async (providerId: string): Promise<Review[]> => {
       id: doc.id,
       createdAt: timestampToDate(data.createdAt),
       updatedAt: data.updatedAt ? timestampToDate(data.updatedAt) : undefined,
+      providerReplyAt: data.providerReplyAt ? timestampToDate(data.providerReplyAt) : undefined,
     };
   });
 
@@ -1701,6 +1716,37 @@ export const deleteReview = async (reviewId: string): Promise<void> => {
 
   // Update provider's rating after deletion
   await updateProviderRating(providerId);
+};
+
+// Add provider reply to a review (only one reply allowed)
+export const replyToReview = async (
+  reviewId: string,
+  providerId: string,
+  reply: string,
+): Promise<void> => {
+  const reviewRef = doc(db, COLLECTIONS.REVIEWS, reviewId);
+  const reviewSnap = await getDoc(reviewRef);
+
+  if (!reviewSnap.exists()) {
+    throw new Error("Review not found");
+  }
+
+  const reviewData = reviewSnap.data() as FirestoreReview;
+
+  // Verify the provider owns this review (it's directed to them)
+  if (reviewData.providerId !== providerId) {
+    throw new Error("Not authorized to reply to this review");
+  }
+
+  // Check if already replied
+  if (reviewData.providerReply) {
+    throw new Error("Already replied to this review");
+  }
+
+  await updateDoc(reviewRef, {
+    providerReply: reply.trim(),
+    providerReplyAt: serverTimestamp(),
+  });
 };
 
 // ============================================

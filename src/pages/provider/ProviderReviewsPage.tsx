@@ -2,18 +2,20 @@ import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Star, MessageSquare, User, Flag } from "lucide-react";
+import { ArrowLeft, Star, MessageSquare, User, Flag, Reply, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { StarRating } from "@/components/StarRating";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
-import { useProviderReviews } from "@/hooks/queries/useReviews";
+import { useProviderReviews, useReplyToReview } from "@/hooks/queries/useReviews";
 import { useProviderProfile } from "@/hooks/queries/useProviders";
 import { ReportDialog } from "@/components/ReportDialog";
 import { Review } from "@/types";
+import { toast } from "sonner";
 
 const ProviderReviewsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -23,14 +25,47 @@ const ProviderReviewsPage: React.FC = () => {
 
   const { data: reviews = [], isLoading } = useProviderReviews(user?.uid || "");
   const { data: profile } = useProviderProfile(user?.uid || "");
+  const replyMutation = useReplyToReview();
 
   // Report dialog state
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [reviewToReport, setReviewToReport] = useState<Review | null>(null);
 
+  // Reply state
+  const [replyingToReview, setReplyingToReview] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+
   const handleReportReview = (review: Review) => {
     setReviewToReport(review);
     setReportDialogOpen(true);
+  };
+
+  const handleStartReply = (reviewId: string) => {
+    setReplyingToReview(reviewId);
+    setReplyText("");
+  };
+
+  const handleCancelReply = () => {
+    setReplyingToReview(null);
+    setReplyText("");
+  };
+
+  const handleSubmitReply = async (reviewId: string) => {
+    if (!replyText.trim() || !user?.uid) return;
+
+    try {
+      await replyMutation.mutateAsync({
+        reviewId,
+        providerId: user.uid,
+        reply: replyText.trim(),
+      });
+      toast.success(t("providerReviews.replySuccess"));
+      setReplyingToReview(null);
+      setReplyText("");
+    } catch (error) {
+      console.error("Failed to reply:", error);
+      toast.error(t("providerReviews.replyError"));
+    }
   };
 
   const fadeInUp = {
@@ -207,6 +242,63 @@ const ProviderReviewsPage: React.FC = () => {
                           </p>
                         )}
 
+                        {/* Provider Reply */}
+                        {review.providerReply && (
+                          <div className="mt-3 p-3 bg-muted/50 rounded-lg border-s-2 border-primary">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Reply className="h-3.5 w-3.5 text-primary" />
+                              <span className="text-xs font-medium text-primary">
+                                {t("providerReviews.yourReply")}
+                              </span>
+                            </div>
+                            <p className="text-sm text-foreground">
+                              {review.providerReply}
+                            </p>
+                            {review.providerReplyAt && (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {new Date(review.providerReplyAt).toLocaleDateString(
+                                  isArabic ? "ar-SA" : "en-US",
+                                  {
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric",
+                                  },
+                                )}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Reply Input */}
+                        {replyingToReview === review.id && (
+                          <div className="mt-3 space-y-2">
+                            <Textarea
+                              placeholder={t("providerReviews.replyPlaceholder")}
+                              value={replyText}
+                              onChange={(e) => setReplyText(e.target.value)}
+                              className="min-h-[80px]"
+                              maxLength={500}
+                            />
+                            <div className="flex gap-2 justify-end">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleCancelReply}
+                              >
+                                {t("common.cancel")}
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleSubmitReply(review.id)}
+                                disabled={!replyText.trim() || replyMutation.isPending}
+                              >
+                                <Send className="h-4 w-4 me-1" />
+                                {t("providerReviews.sendReply")}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Date */}
                         <p className="mt-2 text-xs text-muted-foreground">
                           {new Date(review.createdAt).toLocaleDateString(
@@ -222,16 +314,32 @@ const ProviderReviewsPage: React.FC = () => {
                           )}
                         </p>
 
-                        {/* Report Button */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="mt-2 text-muted-foreground hover:text-destructive gap-1 h-7 px-2"
-                          onClick={() => handleReportReview(review)}
-                        >
-                          <Flag className="h-3.5 w-3.5" />
-                          {t("report.flagReview")}
-                        </Button>
+                        {/* Action Buttons */}
+                        <div className="mt-2 flex gap-2">
+                          {/* Reply Button - only show if no reply yet and not currently replying */}
+                          {!review.providerReply && replyingToReview !== review.id && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-primary hover:text-primary gap-1 h-7 px-2"
+                              onClick={() => handleStartReply(review.id)}
+                            >
+                              <Reply className="h-3.5 w-3.5" />
+                              {t("providerReviews.reply")}
+                            </Button>
+                          )}
+                          
+                          {/* Report Button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground hover:text-destructive gap-1 h-7 px-2"
+                            onClick={() => handleReportReview(review)}
+                          >
+                            <Flag className="h-3.5 w-3.5" />
+                            {t("report.flagReview")}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardContent>

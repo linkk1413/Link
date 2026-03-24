@@ -279,6 +279,43 @@ const ProviderDashboardPage: React.FC = () => {
           </motion.div>
         )}
 
+        {/* Subscription/Trial Expired Warning */}
+        {isExpired && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 rounded-2xl bg-destructive/10 p-4 border border-destructive/20"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/20">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-destructive">
+                  {subscriptionStatus.isTrialExpired
+                    ? t("provider.trialExpiredTitle")
+                    : t("provider.subscriptionExpiredTitle")}
+                </h3>
+                <p className="text-sm text-destructive/80">
+                  {subscriptionStatus.isTrialExpired
+                    ? t("provider.trialExpiredMessage")
+                    : t("provider.subscriptionExpiredMessage")}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {t("provider.servicesHiddenMessage")}
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => navigate("/provider/subscription")}
+              >
+                {t("subscription.renewSubscription")}
+              </Button>
+            </div>
+          </motion.div>
+        )}
+
         <motion.div
           initial="hidden"
           animate="visible"

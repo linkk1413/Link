@@ -266,6 +266,8 @@ export interface Review {
   serviceName?: string; // For display purposes
   rating: number; // 1-5
   comment?: string;
+  providerReply?: string; // Reply from the provider (one reply only)
+  providerReplyAt?: Date; // When the provider replied
   createdAt: Date;
   updatedAt?: Date;
 }

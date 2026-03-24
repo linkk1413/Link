@@ -801,6 +801,7 @@
     "subscriptionExpiredMessage": "انتهى اشتراكك. الرجاء تجديده لمتابعة استخدام المنصة.",
     "trialExpiredTitle": "انتهت الفترة التجريبية",
     "trialExpiredMessage": "انتهت فترتك التجريبية المجانية. يلزم الاشتراك لمتابعة استخدام المنصة وقبول الحجوزات.",
+    "servicesHiddenMessage": "خدماتك مخفية حالياً عن العملاء. جددي اشتراكك لإظهارها.",
     "subscriptionExpiringTitle": "الاشتراك ينتهي قريباً",
     "subscriptionExpiringMessage": "ينتهي اشتراكك خلال {{days}} أيام. جددي الآن لتجنب تعطل الخدمة.",
     "subscribeNow": "اشترك الآن",
@@ -840,7 +841,14 @@
     "noReviews": "لا توجد تقييمات بعد",
     "noReviewsDescription": "عندما يترك العملاء تقييمات، ستظهر هنا.",
     "anonymousClient": "عميلة",
-    "viewAll": "عرض جميع التقييمات"
+    "viewAll": "عرض جميع التقييمات",
+    "reply": "رد",
+    "yourReply": "ردك",
+    "providerReply": "رد مقدمة الخدمة",
+    "replyPlaceholder": "اكتبي ردك هنا...",
+    "sendReply": "إرسال الرد",
+    "replySuccess": "تم إرسال الرد بنجاح",
+    "replyError": "حدث خطأ أثناء إرسال الرد"
   },
   "subscription": {
     "renewSubscription": "جدد الاشتراك",

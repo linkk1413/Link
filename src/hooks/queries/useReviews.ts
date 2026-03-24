@@ -8,6 +8,7 @@ import {
   createReview,
   updateReview,
   deleteReview,
+  replyToReview,
 } from "@/lib/firestore";
 import { Review } from "@/types";
 import { providerKeys } from "./useProviders";
@@ -202,6 +203,33 @@ export const useDeleteReview = () => {
       // Invalidate all providers list
       queryClient.invalidateQueries({
         queryKey: providerKeys.all,
+      });
+    },
+  });
+};
+
+// Reply to a review (provider only, one reply per review)
+export const useReplyToReview = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      reviewId,
+      providerId,
+      reply,
+    }: {
+      reviewId: string;
+      providerId: string;
+      reply: string;
+    }) => replyToReview(reviewId, providerId, reply),
+    onSuccess: (_, variables) => {
+      // Invalidate review detail
+      queryClient.invalidateQueries({
+        queryKey: reviewKeys.detail(variables.reviewId),
+      });
+      // Invalidate provider reviews list
+      queryClient.invalidateQueries({
+        queryKey: reviewKeys.byProvider(variables.providerId),
       });
     },
   });

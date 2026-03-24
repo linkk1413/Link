@@ -11,7 +11,9 @@ service cloud.firestore {
     }
 
     function role() {
-      return signedIn() ? userDoc().data.role : null;
+      // Check activeRole first for role switching support, fallback to legacy role field
+      let userData = userDoc().data;
+      return signedIn() ? (userData.activeRole != null ? userData.activeRole : userData.role) : null;
     }
 
     function bookingDoc(bookingId) {
@@ -138,8 +140,18 @@ service cloud.firestore {
 
     match /reviews/{reviewId} {
       allow read: if true;
-      allow create: if signedIn() && isClient() && request.resource.data.clientId == request.auth.uid;
-      allow update: if isAdmin();
+      // Allow clients to create reviews (check activeRole is CLIENT or roles include CLIENT or has no role yet)
+      allow create: if signedIn() && request.resource.data.clientId == request.auth.uid;
+      // Allow providers to add reply to reviews about them, and admins to update anything
+      allow update: if isAdmin() || (
+        signedIn() && isProvider() && 
+        resource.data.providerId == request.auth.uid &&
+        // Only allow adding reply fields, not modifying rating/comment
+        request.resource.data.rating == resource.data.rating &&
+        request.resource.data.comment == resource.data.comment &&
+        request.resource.data.clientId == resource.data.clientId &&
+        request.resource.data.providerId == resource.data.providerId
+      );
       allow delete: if isAdmin() || (signedIn() && resource.data.clientId == request.auth.uid);
     }
 

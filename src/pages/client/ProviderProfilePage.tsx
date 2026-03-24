@@ -15,6 +15,7 @@ import {
   Ban,
   MoreVertical,
   Edit,
+  Reply,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -417,6 +418,20 @@ const ProviderProfilePage: React.FC = () => {
                         <p className="mt-2 text-sm text-foreground">
                           "{review.comment}"
                         </p>
+                      )}
+                      {/* Provider Reply */}
+                      {review.providerReply && (
+                        <div className="mt-3 p-3 bg-muted/50 rounded-lg border-s-2 border-primary">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Reply className="h-3.5 w-3.5 text-primary" />
+                            <span className="text-xs font-medium text-primary">
+                              {t("providerReviews.providerReply")}
+                            </span>
+                          </div>
+                          <p className="text-sm text-foreground">
+                            {review.providerReply}
+                          </p>
+                        </div>
                       )}
                     </div>
                   ))}
