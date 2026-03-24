@@ -43,25 +43,65 @@ const PAYPAL_SDK_ID = "paypal-js-sdk";
 
 const loadPayPalScript = (clientId: string, currency: string) =>
   new Promise<void>((resolve, reject) => {
+    // Already loaded
     if (window.paypal) {
       resolve();
       return;
     }
 
-    const existing = document.getElementById(PAYPAL_SDK_ID);
+    // Check if script is already in DOM
+    const existing = document.getElementById(PAYPAL_SDK_ID) as HTMLScriptElement | null;
     if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject());
-      return;
+      // Script exists, wait for it or check if it's already loaded
+      if (existing.dataset.loaded === "true") {
+        if (window.paypal) {
+          resolve();
+        } else {
+          reject(new Error("PayPal SDK failed to initialize"));
+        }
+        return;
+      }
+      if (existing.dataset.loading === "true") {
+        // Wait for existing script to finish loading
+        const checkInterval = setInterval(() => {
+          if (window.paypal) {
+            clearInterval(checkInterval);
+            resolve();
+          } else if (existing.dataset.loaded === "true") {
+            clearInterval(checkInterval);
+            reject(new Error("PayPal SDK failed to initialize"));
+          }
+        }, 100);
+        // Timeout after 10 seconds
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          reject(new Error("PayPal SDK load timeout"));
+        }, 10000);
+        return;
+      }
     }
 
     const script = document.createElement("script");
     script.id = PAYPAL_SDK_ID;
-    // Card-only: disable PayPal, Venmo, PayLater; enable only card funding
-    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&intent=authorize&currency=${currency}&disable-funding=venmo,paypal,paylater,credit&enable-funding=card`;
+    script.dataset.loading = "true";
+    // Disable alternative funding sources, card is always available by default
+    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&intent=authorize&currency=${currency}&disable-funding=venmo,paylater,credit`;
     script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject();
+    script.onload = () => {
+      script.dataset.loaded = "true";
+      script.dataset.loading = "false";
+      if (window.paypal) {
+        resolve();
+      } else {
+        reject(new Error("PayPal SDK failed to initialize after load"));
+      }
+    };
+    script.onerror = (e) => {
+      script.dataset.loaded = "true";
+      script.dataset.loading = "false";
+      console.error("PayPal SDK load error:", e);
+      reject(new Error("Failed to load PayPal SDK script"));
+    };
     document.body.appendChild(script);
   });
 
@@ -95,16 +135,22 @@ const PayPalCheckout: React.FC<PayPalCheckoutProps> = ({
 
     loadPayPalScript(clientId, currency)
       .then(() => {
-        if (!cancelled) setIsReady(true);
+        if (!cancelled) {
+          console.log("PayPal SDK loaded successfully");
+          setIsReady(true);
+        }
       })
-      .catch(() => {
-        if (!cancelled) onError?.("Failed to load PayPal SDK.");
+      .catch((err) => {
+        console.error("PayPal SDK load failed:", err);
+        if (!cancelled) {
+          onError?.(err?.message || "Failed to load PayPal SDK.");
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [currency, onError]);
+  }, [currency, onError, apiBaseUrl]);
 
   useEffect(() => {
     if (!isReady || !buttonRef.current) return;
@@ -132,7 +178,6 @@ const PayPalCheckout: React.FC<PayPalCheckoutProps> = ({
         label: "pay",
         color: "black",
       },
-      fundingSource: "card" as unknown as undefined, // Force card-only display
       createOrder: async () => {
         const response = await fetch(`${apiBaseUrl}/paypalCreateOrder`, {
           method: "POST",
