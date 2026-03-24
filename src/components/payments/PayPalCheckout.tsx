@@ -117,13 +117,13 @@ const PayPalCheckout: React.FC<PayPalCheckoutProps> = ({
   const renderKeyRef = useRef<string>("");
   const renderingRef = useRef(false);
   
-  // Firebase Functions base URL (auto-detect region)
+  // Cloud Run server URL
   const apiBaseUrl = import.meta.env.VITE_PAYPAL_API_BASE_URL || 
-    "https://us-central1-link-e843b.cloudfunctions.net";
+    "https://server-link-190979667993.europe-west3.run.app";
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // PayPal Client ID (public key - safe to expose in client code)
+    // PayPal Live Client ID (public key - safe to expose in client code)
     const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || 
       "AWkGBizXAEAdUwUnBMn9I0uinN9MHMm8nT4-TfER-q22tcJIa5YQdMLbNP8t_pGkexK5eeLvnto0Rj3s";
     if (!clientId || !apiBaseUrl) {
