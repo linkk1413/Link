@@ -84,9 +84,14 @@ const loadPayPalScript = (clientId: string, currency: string) =>
     const script = document.createElement("script");
     script.id = PAYPAL_SDK_ID;
     script.dataset.loading = "true";
-    // Disable alternative funding sources, card is always available by default
-    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&intent=authorize&currency=${currency}&disable-funding=venmo,paylater,credit`;
+    // Enable card payments explicitly for better mobile support
+    // components=buttons includes card fields support
+    // data-sdk-integration-source helps PayPal optimize for different environments
+    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&intent=authorize&currency=${currency}&components=buttons&enable-funding=card&disable-funding=venmo,paylater,credit`;
     script.async = true;
+    script.setAttribute("data-page-type", "checkout");
+    script.setAttribute("data-sdk-integration-source", "button-factory");
+    script.setAttribute("data-csp-nonce", "");
     script.onload = () => {
       script.dataset.loaded = "true";
       script.dataset.loading = "false";
@@ -178,7 +183,10 @@ const PayPalCheckout: React.FC<PayPalCheckoutProps> = ({
         label: "pay",
         color: "black",
       },
+      // Use popup flow on mobile for better compatibility
+      fundingSource: undefined,
       createOrder: async () => {
+        console.log("PayPal createOrder started");
         const response = await fetch(`${apiBaseUrl}/paypalCreateOrder`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -255,6 +263,14 @@ const PayPalCheckout: React.FC<PayPalCheckoutProps> = ({
         console.error("PayPal error", err);
         onError?.("PayPal checkout failed. Please try again.");
       },
+      onClick: (_data: unknown, actions: { resolve: () => void; reject: () => void }) => {
+        // This fires when user clicks the button - helps with mobile
+        console.log("PayPal button clicked");
+        return actions.resolve();
+      },
+      onCancel: () => {
+        console.log("PayPal checkout cancelled");
+      },
     });
 
     buttonsInstanceRef.current = instance;
@@ -290,10 +306,18 @@ const PayPalCheckout: React.FC<PayPalCheckoutProps> = ({
 
   return (
     <div className="space-y-3">
-      <div ref={buttonRef} />
-      <Button type="button" variant="outline" className="w-full" disabled>
-        {`Pay ${amount.toFixed(2)} ${currency}`}
-      </Button>
+      {!isReady && (
+        <div className="flex items-center justify-center py-4">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <span className="ml-2 text-sm text-muted-foreground">Loading payment options...</span>
+        </div>
+      )}
+      <div ref={buttonRef} className={isReady ? "" : "hidden"} />
+      {isReady && (
+        <p className="text-xs text-muted-foreground text-center">
+          Tip: If card payment doesn't load, try PayPal login or a different browser
+        </p>
+      )}
     </div>
   );
 };
