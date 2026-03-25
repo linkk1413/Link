@@ -25,6 +25,15 @@ const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
 const orderMetaCache = new Map();
 
+// Cache for access token (PayPal tokens last ~9 hours)
+let cachedAccessToken = null;
+let tokenExpiresAt = 0;
+
+// Cache for exchange rate (refresh every 10 minutes)
+let cachedFxRate = null;
+let fxRateExpiresAt = 0;
+const FX_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 const fetchJson = async (url) => {
   const response = await fetch(url);
   if (!response.ok) {
@@ -35,10 +44,19 @@ const fetchJson = async (url) => {
 };
 
 const getSarToUsdRate = async () => {
+  // Return cached rate if still valid
+  if (cachedFxRate && Date.now() < fxRateExpiresAt) {
+    return cachedFxRate;
+  }
+
   try {
     const data = await fetchJson("https://open.er-api.com/v6/latest/SAR");
     const rate = data?.rates?.USD;
-    if (rate) return Number(rate);
+    if (rate) {
+      cachedFxRate = Number(rate);
+      fxRateExpiresAt = Date.now() + FX_CACHE_TTL;
+      return cachedFxRate;
+    }
   } catch (error) {
     console.warn("ER-API FX failed:", error.message);
   }
@@ -48,17 +66,28 @@ const getSarToUsdRate = async () => {
       "https://api.exchangerate.host/latest?base=SAR&symbols=USD",
     );
     const rate = data?.rates?.USD;
-    if (rate) return Number(rate);
+    if (rate) {
+      cachedFxRate = Number(rate);
+      fxRateExpiresAt = Date.now() + FX_CACHE_TTL;
+      return cachedFxRate;
+    }
   } catch (error) {
     console.warn("ExchangeRate.host FX failed:", error.message);
   }
 
   const fallbackRate = 0.27;
   console.warn("FX rate missing USD. Falling back to", fallbackRate);
+  cachedFxRate = fallbackRate;
+  fxRateExpiresAt = Date.now() + FX_CACHE_TTL;
   return fallbackRate;
 };
 
 const getAccessToken = async () => {
+  // Return cached token if still valid (with 5 min buffer)
+  if (cachedAccessToken && Date.now() < tokenExpiresAt - 5 * 60 * 1000) {
+    return cachedAccessToken;
+  }
+
   const clientId = process.env.PAYPAL_CLIENT_ID;
   const secret = process.env.PAYPAL_CLIENT_SECRET;
   if (!clientId || !secret) {
@@ -81,7 +110,10 @@ const getAccessToken = async () => {
   }
 
   const data = await response.json();
-  return data.access_token;
+  cachedAccessToken = data.access_token;
+  // PayPal tokens typically expire in ~9 hours (32400 seconds)
+  tokenExpiresAt = Date.now() + (data.expires_in || 32400) * 1000;
+  return cachedAccessToken;
 };
 
 // Handler function for PayPal create order
@@ -92,14 +124,18 @@ const handlePayPalCreateOrder = async (req, res) => {
       return res.status(400).json({ error: "Missing amountSar" });
     }
 
-    const fxRate = await getSarToUsdRate();
+    // Fetch FX rate and access token in parallel for speed
+    const [fxRate, accessToken] = await Promise.all([
+      getSarToUsdRate(),
+      getAccessToken(),
+    ]);
+    
     const amountUsd = Number(amountSar) * fxRate;
 
     if (!Number.isFinite(amountUsd)) {
       return res.status(400).json({ error: "Invalid SAR amount" });
     }
 
-    const accessToken = await getAccessToken();
     const response = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders`, {
       method: "POST",
       headers: {
