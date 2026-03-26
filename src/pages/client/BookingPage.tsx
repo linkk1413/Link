@@ -18,7 +18,7 @@ import { useProviderProfile } from "@/hooks/queries/useProviders";
 import { useCreateBooking } from "@/hooks/queries/useBookings";
 import { useCreatePayment } from "@/hooks/queries/usePayments";
 import { useAuth } from "@/contexts/AuthContext";
-import TapCheckout from "@/components/payments/TapCheckout";
+import PayPalCheckout from "@/components/payments/PayPalCheckout";
 import { toast } from "@/components/ui/sonner";
 
 // Generate time slots
@@ -538,15 +538,13 @@ const BookingPage: React.FC = () => {
                   </div>
                 )}
 
-                <TapCheckout
+                <PayPalCheckout
                   amount={service.price}
                   bookingMeta={{
                     serviceId: service.id,
                     providerId: service.providerId,
                   }}
-                  customerEmail={user?.email || ""}
-                  customerName={user?.displayName || user?.email?.split("@")[0] || "Customer"}
-                  onSuccess={handleTapSuccess}
+                  onAuthorized={handlePayPalAuthorized}
                   onError={(message) => setPaymentError(message)}
                 />
 
