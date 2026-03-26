@@ -479,7 +479,7 @@ const BookingPage: React.FC = () => {
 
       {/* Confirmation Dialog */}
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           {bookingSuccess ? (
             <>
               <DialogHeader>
