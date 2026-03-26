@@ -61,7 +61,6 @@ const TapCheckout: React.FC<TapCheckoutProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const publishableKey = import.meta.env.VITE_TAP_PUBLISHABLE_KEY;
-  const merchantId = import.meta.env.VITE_TAP_MERCHANT_ID;
   const callbackUrl =
     import.meta.env.VITE_TAP_CALLBACK_URL ||
     `${window.location.origin}/client/tap-callback`;
@@ -97,11 +96,9 @@ const TapCheckout: React.FC<TapCheckoutProps> = ({
         containerID: "tap-payment-container",
         gateway: {
           publicKey: publishableKey,
-          merchantId: merchantId || undefined,
           language: i18n.language === "ar" ? "ar" : "en",
-          contactInfo: false,
-          supportedCurrencies: "SAR",
-          supportedPaymentMethods: ["VISA", "MASTERCARD", "MADA"],
+          supportedCurrencies: "all",
+          supportedPaymentMethods: "all",
           saveCardOption: false,
           customerCards: false,
           notifications: "standard",
@@ -126,63 +123,34 @@ const TapCheckout: React.FC<TapCheckoutProps> = ({
           onClose: () => {
             console.log("Tap closed");
           },
-          labels: {
-            cardNumber: t("payment.cardNumber", "Card Number"),
-            expirationDate: t("payment.expiryDate", "MM/YY"),
-            cvv: t("payment.cvv", "CVV"),
-            cardHolder: t("payment.cardHolder", "Card Holder"),
-            actionButton: t("payment.payNow", "Pay Now"),
-          },
-          style: {
-            base: {
-              color: "#535353",
-              lineHeight: "18px",
-              fontFamily: "sans-serif",
-              fontSize: "16px",
-              "::placeholder": { color: "#9e9e9e" },
-            },
-            invalid: { color: "#ef4444" },
-          },
         },
         customer: {
-          first_name: customerName.split(" ")[0] || "Customer",
-          middle_name: "",
-          last_name: customerName.split(" ").slice(1).join(" ") || "User",
-          email: customerEmail || "customer@example.com",
-          phone: { country_code: "966", number: customerPhone?.replace(/^0/, "") || "500000000" },
+          first_name: customerName.split(" ")[0] || "Guest",
+          last_name: customerName.split(" ").slice(1).join(" ") || "Customer",
+          email: customerEmail || "guest@example.com",
+          phone: { 
+            country_code: "966", 
+            number: "500000000"
+          },
         },
         order: {
           amount: Number(amount),
           currency: "SAR",
-          items: [
-            {
-              id: bookingMeta.serviceId,
-              name: "Service Booking",
-              description: "Booking payment",
-              quantity: 1,
-              amount_per_unit: Number(amount),
-              total_amount: Number(amount),
-            },
-          ],
-          shipping: null,
-          taxes: null,
+          items: [],
         },
         transaction: {
           mode: "charge",
           charge: {
             saveCard: false,
             threeDSecure: true,
-            description: "Service Booking Payment",
-            statement_descriptor: "Link Booking",
+            description: "Service Booking",
+            statement_descriptor: "LINK",
             reference: {
               transaction: `txn_${Date.now()}`,
-              order: `order_${bookingMeta.serviceId}_${Date.now()}`,
+              order: `order_${Date.now()}`,
             },
-            metadata: {
-              serviceId: bookingMeta.serviceId,
-              providerId: bookingMeta.providerId,
-            },
-            receipt: { email: true, sms: false },
+            metadata: {},
+            receipt: { email: false, sms: false },
             redirect: callbackUrl,
             post: null,
           },
