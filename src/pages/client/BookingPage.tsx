@@ -18,7 +18,7 @@ import { useProviderProfile } from "@/hooks/queries/useProviders";
 import { useCreateBooking } from "@/hooks/queries/useBookings";
 import { useCreatePayment } from "@/hooks/queries/usePayments";
 import { useAuth } from "@/contexts/AuthContext";
-import PayPalCheckout from "@/components/payments/PayPalCheckout";
+import TapCheckout from "@/components/payments/TapCheckout";
 import { toast } from "@/components/ui/sonner";
 
 // Generate time slots
@@ -142,6 +142,116 @@ const BookingPage: React.FC = () => {
         fxRate: payload.fxRate,
         orderId: payload.orderId,
         authorizationId: payload.authorizationId,
+        platformFee: 0,
+        gatewayFee: 0,
+        providerAmount: service.price,
+      });
+
+      // Send booking confirmation email
+      try {
+        const dateStr = startAt.toLocaleDateString(
+          i18n.language === "ar" ? "ar-SA" : "en-US",
+          {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          },
+        );
+        const timeStr = startAt.toLocaleTimeString(
+          i18n.language === "ar" ? "ar-SA" : "en-US",
+          {
+            hour: "2-digit",
+            minute: "2-digit",
+          },
+        );
+
+        const apiBaseUrl = import.meta.env.VITE_PAYPAL_API_BASE_URL || "";
+        await fetch(`${apiBaseUrl}/api/auth/send-booking-confirmation`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clientEmail: user.email,
+            clientName: user.displayName || user.email.split("@")[0],
+            providerName: provider?.name || "Provider",
+            serviceName: service.title,
+            date: dateStr,
+            time: timeStr,
+          }),
+        });
+      } catch (emailError) {
+        // Non-blocking: Email failure doesn't prevent booking
+        console.error("Failed to send booking confirmation email:", emailError);
+      }
+
+      setBookingSuccess(true);
+    } catch (error) {
+      console.error("Failed to finalize booking:", error);
+      setPaymentError(t("common.error"));
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
+  const handleTapSuccess = async (payload: { chargeId: string; status: string }) => {
+    const { chargeId, status } = payload;
+    if (
+      !service ||
+      !selectedDate ||
+      !selectedTime ||
+      !selectedLocation ||
+      !user
+    ) {
+      setPaymentError(t("booking.validationError"));
+      return;
+    }
+
+    setIsPaying(true);
+    setPaymentError(null);
+
+    // Create start date/time
+    const [hours, minutes] = selectedTime.split(":").map(Number);
+    const startAt = new Date(selectedDate);
+    startAt.setHours(hours, minutes, 0, 0);
+
+    // Calculate end time
+    const endAt = new Date(startAt);
+    endAt.setMinutes(endAt.getMinutes() + service.durationMin);
+
+    try {
+      const bookingId = await createBookingMutation.mutateAsync({
+        clientId: user.uid,
+        providerId: service.providerId,
+        serviceId: service.id,
+        startAt,
+        endAt,
+        bookingDate: startAt.toISOString().split("T")[0], // "YYYY-MM-DD"
+        status: "PENDING",
+        priceTotal: service.price,
+        depositAmount: 0,
+        locationType: selectedLocation,
+        clientName: user.displayName || user.email?.split("@")[0] || "",
+        serviceName: service.title,
+        addressText:
+          selectedLocation === "AT_PROVIDER"
+            ? t("services.atProvider")
+            : t("services.atClient"),
+      });
+
+      await createPaymentMutation.mutateAsync({
+        bookingId,
+        clientId: user.uid,
+        providerId: service.providerId,
+        payType: "FULL",
+        status: status === "CAPTURED" ? "CAPTURED" : "AUTHORIZED",
+        gateway: "TAP",
+        amount: service.price,
+        currency: "SAR",
+        amountSar: service.price,
+        amountUsd: 0, // Tap processes in SAR directly
+        fxRate: 1,
+        orderId: chargeId,
+        authorizationId: chargeId,
         platformFee: 0,
         gatewayFee: 0,
         providerAmount: service.price,
@@ -428,13 +538,15 @@ const BookingPage: React.FC = () => {
                   </div>
                 )}
 
-                <PayPalCheckout
+                <TapCheckout
                   amount={service.price}
                   bookingMeta={{
                     serviceId: service.id,
                     providerId: service.providerId,
                   }}
-                  onAuthorized={handlePayPalAuthorized}
+                  customerEmail={user?.email || ""}
+                  customerName={user?.displayName || user?.email?.split("@")[0] || "Customer"}
+                  onSuccess={handleTapSuccess}
                   onError={(message) => setPaymentError(message)}
                 />
 
