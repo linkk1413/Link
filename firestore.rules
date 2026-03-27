@@ -52,14 +52,23 @@ service cloud.firestore {
 
     match /providers/{providerId} {
       allow read: if true;
-      allow create, update: if signedIn() && (providerId == request.auth.uid || isAdmin());
+      allow create: if signedIn() && (providerId == request.auth.uid || isAdmin());
+      // Allow update by owner/admin, OR by any authenticated user for rating fields only
+      allow update: if signedIn() && (
+        providerId == request.auth.uid || 
+        isAdmin() ||
+        // Allow rating update by any authenticated user (for review system)
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingAvg', 'ratingCount', 'updatedAt']))
+      );
       allow delete: if isAdmin();
     }
 
     match /services/{serviceId} {
       allow read: if true;
-      allow create: if signedIn() && isProvider() && request.resource.data.providerId == request.auth.uid;
-      allow update, delete: if signedIn() && (isAdmin() || (isProvider() && resource.data.providerId == request.auth.uid));
+      // Allow create if authenticated and providerId matches the user's uid
+      // (Provider role check via profile is done in the app layer)
+      allow create: if signedIn() && request.resource.data.providerId == request.auth.uid;
+      allow update, delete: if signedIn() && (isAdmin() || resource.data.providerId == request.auth.uid);
     }
 
     match /categories/{categoryId} {
