@@ -16,6 +16,8 @@ import {
   Loader2,
   FolderOpen,
   Settings,
+  Phone,
+  Mail,
 } from "lucide-react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
@@ -134,6 +136,13 @@ const AdminDashboardPage: React.FC = () => {
     }>,
   });
 
+  // Contact info form state
+  const [contactForm, setContactForm] = useState({
+    contactEmail: "",
+    contactPhone: "",
+    contactWhatsapp: "",
+  });
+
   // Category management state
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -196,6 +205,12 @@ const AdminDashboardPage: React.FC = () => {
           },
         ],
       });
+      // Initialize contact form
+      setContactForm({
+        contactEmail: subscriptionSettings.contactEmail || "",
+        contactPhone: subscriptionSettings.contactPhone || "",
+        contactWhatsapp: subscriptionSettings.contactWhatsapp || "",
+      });
     }
   }, [subscriptionSettings]);
 
@@ -225,6 +240,16 @@ const AdminDashboardPage: React.FC = () => {
       toast.success(t("admin.subscriptionUpdated"));
     } catch (error) {
       console.error("Failed to update subscription settings:", error);
+      toast.error(t("common.error"));
+    }
+  };
+
+  const handleContactUpdate = async () => {
+    try {
+      await updateSubscriptionSettings.mutateAsync(contactForm);
+      toast.success(t("admin.contactUpdated"));
+    } catch (error) {
+      console.error("Failed to update contact info:", error);
       toast.error(t("common.error"));
     }
   };
@@ -1701,6 +1726,91 @@ const AdminDashboardPage: React.FC = () => {
             {updateSubscriptionSettings.isPending
               ? t("common.saving")
               : t("admin.saveSubscription")}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Contact Info Settings */}
+      <Card className="mb-8 border-dashed">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Phone className="h-5 w-5" />
+            {t("admin.contactSettings")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="contact-email">{t("admin.contactEmail")}</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="contact-email"
+                  type="email"
+                  placeholder="support@example.com"
+                  value={contactForm.contactEmail}
+                  onChange={(e) =>
+                    setContactForm((prev) => ({
+                      ...prev,
+                      contactEmail: e.target.value,
+                    }))
+                  }
+                  className="pl-10"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("admin.contactEmailHint")}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact-phone">{t("admin.contactPhone")}</Label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="contact-phone"
+                  type="tel"
+                  placeholder="+966 55 123 4567"
+                  value={contactForm.contactPhone}
+                  onChange={(e) =>
+                    setContactForm((prev) => ({
+                      ...prev,
+                      contactPhone: e.target.value,
+                    }))
+                  }
+                  className="pl-10"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("admin.contactPhoneHint")}
+              </p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="contact-whatsapp">{t("admin.contactWhatsapp")}</Label>
+            <Input
+              id="contact-whatsapp"
+              type="url"
+              placeholder="https://wa.me/966551234567"
+              value={contactForm.contactWhatsapp}
+              onChange={(e) =>
+                setContactForm((prev) => ({
+                  ...prev,
+                  contactWhatsapp: e.target.value,
+                }))
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("admin.contactWhatsappHint")}
+            </p>
+          </div>
+          <Button
+            onClick={handleContactUpdate}
+            disabled={updateSubscriptionSettings.isPending}
+            className="w-full sm:w-auto"
+          >
+            {updateSubscriptionSettings.isPending
+              ? t("common.saving")
+              : t("admin.saveContact")}
           </Button>
         </CardContent>
       </Card>

@@ -23,10 +23,10 @@ import PayPalCheckout from "@/components/payments/PayPalCheckout";
 import { doc, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// Admin contact information
-const ADMIN_CONTACT = {
+// Default admin contact info (fallback if not set in database)
+const DEFAULT_CONTACT = {
   phone: "+966 55 297 9710",
-  email: "60azsazs@gmail.com",
+  email: "support@linkbloom.com",
   whatsapp: "https://wa.me/966552979710",
 };
 
@@ -44,6 +44,13 @@ const SubscriptionPaymentPage: React.FC = () => {
   // Fetch subscription settings from database
   const { data: settings, isLoading: settingsLoading } =
     useSubscriptionSettings();
+
+  // Get contact info from settings with fallbacks
+  const ADMIN_CONTACT = useMemo(() => ({
+    phone: settings?.contactPhone || DEFAULT_CONTACT.phone,
+    email: settings?.contactEmail || DEFAULT_CONTACT.email,
+    whatsapp: settings?.contactWhatsapp || DEFAULT_CONTACT.whatsapp,
+  }), [settings]);
 
   // Build plans from settings
   const plans = useMemo(() => {

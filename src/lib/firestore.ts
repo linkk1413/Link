@@ -1891,6 +1891,10 @@ export interface SubscriptionSettings {
   monthlyPrice: number; // Base price in SAR per month
   trialDays: number; // Number of free trial days for new providers
   plans: SubscriptionPlan[];
+  // Contact info settings
+  contactEmail?: string;
+  contactPhone?: string;
+  contactWhatsapp?: string;
   updatedAt?: Date;
 }
 
@@ -1914,6 +1918,9 @@ const DEFAULT_SUBSCRIPTION_SETTINGS: SubscriptionSettings = {
       isActive: true,
     },
   ],
+  contactEmail: "support@linkbloom.com",
+  contactPhone: "+966 55 297 9710",
+  contactWhatsapp: "https://wa.me/966552979710",
 };
 
 export const getSubscriptionSettings =
@@ -1929,6 +1936,9 @@ export const getSubscriptionSettings =
             data.monthlyPrice ?? DEFAULT_SUBSCRIPTION_SETTINGS.monthlyPrice,
           trialDays: data.trialDays ?? DEFAULT_SUBSCRIPTION_SETTINGS.trialDays,
           plans: data.plans ?? DEFAULT_SUBSCRIPTION_SETTINGS.plans,
+          contactEmail: data.contactEmail ?? DEFAULT_SUBSCRIPTION_SETTINGS.contactEmail,
+          contactPhone: data.contactPhone ?? DEFAULT_SUBSCRIPTION_SETTINGS.contactPhone,
+          contactWhatsapp: data.contactWhatsapp ?? DEFAULT_SUBSCRIPTION_SETTINGS.contactWhatsapp,
           updatedAt: data.updatedAt
             ? timestampToDate(data.updatedAt)
             : undefined,
