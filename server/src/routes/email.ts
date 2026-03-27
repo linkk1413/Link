@@ -128,4 +128,47 @@ router.post("/send-verification-email", async (req: Request, res: Response) => {
   }
 });
 
+// Admin notification for subscription payment
+router.post("/notify-admin-subscription", async (req: Request, res: Response) => {
+  try {
+    const {
+      providerName,
+      providerEmail,
+      providerId,
+      planName,
+      planMonths,
+      amount,
+      orderId,
+      gateway,
+    } = req.body;
+
+    // Admin email - same as ADMIN_CONTACT in SubscriptionPaymentPage
+    const adminEmail = process.env.ADMIN_EMAIL || "60azsazs@gmail.com";
+
+    const template = emailTemplates.adminSubscriptionNotification(
+      providerName || "Unknown",
+      providerEmail || "Unknown",
+      providerId || "Unknown",
+      planName || "Unknown",
+      planMonths || 1,
+      amount || 0,
+      orderId || "Unknown",
+      gateway || "PayPal",
+    );
+
+    await sendEmail({
+      to: adminEmail,
+      subject: template.subject,
+      html: template.html,
+    });
+
+    console.log(`Admin notification sent for subscription: ${providerId}`);
+    res.json({ success: true, message: "Admin notification sent" });
+  } catch (error) {
+    console.error("Error sending admin notification:", error);
+    // Don't fail the whole flow if admin notification fails
+    res.status(500).json({ error: "Failed to send admin notification" });
+  }
+});
+
 export default router;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProviderProfile } from "./queries/useProviders";
-import { checkAndExpireTrial } from "@/lib/firestore";
+import { checkAndExpireTrial, getUserDocument } from "@/lib/firestore";
 import { ProviderProfile } from "@/types";
 
 interface SubscriptionStatus {
@@ -19,6 +19,7 @@ interface SubscriptionStatus {
  * Hook to check provider's subscription and account status
  * Returns whether account is locked and days until expiration
  * Also checks and expires trials on-access
+ * Checks BOTH providers and users collections for subscription data
  */
 export const useSubscriptionStatus = (): SubscriptionStatus => {
   const { user } = useAuth();
@@ -28,6 +29,11 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
     refetch,
   } = useProviderProfile(user?.uid || "");
   const [trialJustExpired, setTrialJustExpired] = useState(false);
+  const [userSubscriptionData, setUserSubscriptionData] = useState<{
+    subscriptionStatus?: string;
+    subscriptionEndDate?: Date | { toDate?: () => Date };
+    accountStatus?: string;
+  } | null>(null);
   const [status, setStatus] = useState<SubscriptionStatus>({
     isLocked: false,
     isExpired: false,
@@ -38,6 +44,23 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
     profile: null,
     isLoading: true,
   });
+
+  // Fetch subscription data from users collection as fallback
+  useEffect(() => {
+    const fetchUserDoc = async () => {
+      if (user?.uid) {
+        const userDoc = await getUserDocument(user.uid) as unknown as Record<string, unknown> | null;
+        if (userDoc?.subscriptionEndDate) {
+          setUserSubscriptionData({
+            subscriptionStatus: userDoc.subscriptionStatus as string | undefined,
+            subscriptionEndDate: userDoc.subscriptionEndDate as Date | { toDate?: () => Date },
+            accountStatus: userDoc.accountStatus as string | undefined,
+          });
+        }
+      }
+    };
+    fetchUserDoc();
+  }, [user?.uid]);
 
   // Check and expire trial on-access
   useEffect(() => {
@@ -70,13 +93,18 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
       return;
     }
 
-    const isLocked = profile.accountStatus === "LOCKED";
-    const isTrial = profile.subscriptionStatus === "TRIAL";
+    // Use subscription data from provider profile, or fallback to users collection
+    const subscriptionStatus = profile.subscriptionStatus || userSubscriptionData?.subscriptionStatus;
+    const subscriptionEndDate = profile.subscriptionEndDate || userSubscriptionData?.subscriptionEndDate;
+    const accountStatus = profile.accountStatus || userSubscriptionData?.accountStatus;
+
+    const isLocked = accountStatus === "LOCKED";
+    const isTrial = subscriptionStatus === "TRIAL";
     // Treat undefined or missing status as expired
     const isExpired =
-      !profile.subscriptionStatus ||
-      profile.subscriptionStatus === "EXPIRED" ||
-      profile.subscriptionStatus === "CANCELLED";
+      !subscriptionStatus ||
+      subscriptionStatus === "EXPIRED" ||
+      subscriptionStatus === "CANCELLED";
 
     // Check if trial just expired (either just detected or profile shows it was a trial)
     // We check wasOnTrial from profile if available, or use local state
@@ -84,11 +112,11 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
 
     let daysUntilExpiry = -1;
     let trialDaysRemaining = 0;
-    if (profile.subscriptionEndDate) {
+    if (subscriptionEndDate) {
       const today = new Date();
       // Handle Firestore Timestamp or regular Date
       let endDate: Date;
-      const rawDate = profile.subscriptionEndDate as { toDate?: () => Date } | Date | string;
+      const rawDate = subscriptionEndDate as { toDate?: () => Date } | Date | string;
       if (
         rawDate &&
         typeof rawDate === "object" &&
@@ -123,7 +151,7 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
       profile,
       isLoading,
     });
-  }, [profile, isLoading, trialJustExpired]);
+  }, [profile, isLoading, trialJustExpired, userSubscriptionData]);
 
   return status;
 };

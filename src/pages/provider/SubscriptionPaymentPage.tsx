@@ -9,6 +9,8 @@ import {
   Mail,
   Clock,
   AlertCircle,
+  CreditCard,
+  Building,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +19,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscriptionSettings } from "@/hooks/queries/useSubscriptionSettings";
+import PayPalCheckout from "@/components/payments/PayPalCheckout";
+import { doc, updateDoc, Timestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 // Admin contact information
 const ADMIN_CONTACT = {
@@ -30,9 +35,11 @@ const SubscriptionPaymentPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isArabic = i18n.language === "ar";
-  const [selectedMethod, setSelectedMethod] = useState<
-    "bank_transfer" | "card"
-  >("bank_transfer");
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<"paypal" | "bank_transfer">("paypal");
+  const [isPaying, setIsPaying] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   // Fetch subscription settings from database
   const { data: settings, isLoading: settingsLoading } =
@@ -71,6 +78,91 @@ const SubscriptionPaymentPage: React.FC = () => {
       })
       .sort((a, b) => a.months - b.months);
   }, [settings, t]);
+
+  // Get selected plan object
+  const selectedPlan = useMemo(() => {
+    if (!selectedPlanId) return plans[0] || null;
+    return plans.find((p) => p.id === selectedPlanId) || plans[0] || null;
+  }, [selectedPlanId, plans]);
+
+  // Set default plan when plans load
+  React.useEffect(() => {
+    if (plans.length > 0 && !selectedPlanId) {
+      setSelectedPlanId(plans[0].id);
+    }
+  }, [plans, selectedPlanId]);
+
+  // Handle PayPal payment success
+  const handlePayPalAuthorized = async (payload: {
+    orderId: string;
+    authorizationId: string;
+    amountUsd: number;
+    fxRate: number;
+  }) => {
+    if (!user || !selectedPlan) {
+      setPaymentError(t("common.error"));
+      return;
+    }
+
+    setIsPaying(true);
+    setPaymentError(null);
+
+    try {
+      // Calculate subscription end date
+      const now = new Date();
+      const endDate = new Date(now);
+      endDate.setMonth(endDate.getMonth() + selectedPlan.months);
+
+      const subscriptionData = {
+        subscriptionStatus: "active",
+        subscriptionStartDate: Timestamp.fromDate(now),
+        subscriptionEndDate: Timestamp.fromDate(endDate),
+        subscriptionPlanId: selectedPlan.id,
+        subscriptionPlanMonths: selectedPlan.months,
+        lastPaymentDate: Timestamp.fromDate(now),
+        lastPaymentAmount: selectedPlan.price,
+        lastPaymentGateway: "PAYPAL",
+        lastPaymentOrderId: payload.orderId,
+        lastPaymentAuthorizationId: payload.authorizationId,
+        accountStatus: "ACTIVE",
+        isSubscribed: true,
+      };
+
+      // Update BOTH users and providers collections (banner reads from providers)
+      const userRef = doc(db, "users", user.uid);
+      const providerRef = doc(db, "providers", user.uid);
+      
+      await Promise.all([
+        updateDoc(userRef, subscriptionData),
+        updateDoc(providerRef, subscriptionData),
+      ]);
+
+      // Notify admin about the subscription payment (fire and forget)
+      const serverUrl = import.meta.env.VITE_SERVER_URL || "https://server-link-190979667993.europe-west3.run.app";
+      fetch(`${serverUrl}/api/email/notify-admin-subscription`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providerName: user.name,
+          providerEmail: user.email,
+          providerId: user.uid,
+          planName: selectedPlan.name,
+          planMonths: selectedPlan.months,
+          amount: selectedPlan.price,
+          orderId: payload.orderId,
+          gateway: "PayPal",
+        }),
+      }).catch((err) => console.warn("Admin notification failed:", err));
+
+      setPaymentSuccess(true);
+      toast.success(t("subscription.paymentSuccess") || "Payment successful! Your subscription is now active.");
+    } catch (error) {
+      console.error("Failed to activate subscription:", error);
+      setPaymentError(t("common.error"));
+    } finally {
+      setIsPaying(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
@@ -161,13 +253,11 @@ const SubscriptionPaymentPage: React.FC = () => {
                     )}
                     <Card
                       className={`cursor-pointer transition-all ${
-                        selectedMethod === plan.id
+                        selectedPlanId === plan.id
                           ? "border-primary ring-2 ring-primary/50"
                           : "border-border"
                       }`}
-                      onClick={() =>
-                        setSelectedMethod(plan.id as "bank_transfer" | "card")
-                      }
+                      onClick={() => setSelectedPlanId(plan.id)}
                     >
                       <CardHeader>
                         <CardTitle className="text-base">{plan.name}</CardTitle>
@@ -208,9 +298,42 @@ const SubscriptionPaymentPage: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* PayPal Payment */}
+              <div
+                className={`flex cursor-pointer items-start gap-4 rounded-lg border p-4 transition-all ${
+                  selectedMethod === "paypal"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/50"
+                }`}
+                onClick={() => setSelectedMethod("paypal")}
+              >
+                <input
+                  type="radio"
+                  checked={selectedMethod === "paypal"}
+                  onChange={() => setSelectedMethod("paypal")}
+                  className="mt-1"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-primary" />
+                    <h3 className="font-semibold text-foreground">
+                      {t("subscription.paypalPayment") || "PayPal / Card Payment"}
+                    </h3>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {t("subscription.paypalPaymentDesc") ||
+                      "Pay instantly with PayPal or debit/credit card"}
+                  </p>
+                </div>
+              </div>
+
               {/* Bank Transfer */}
               <div
-                className="flex cursor-pointer items-start gap-4 rounded-lg border border-border p-4 transition-all hover:border-primary/50"
+                className={`flex cursor-pointer items-start gap-4 rounded-lg border p-4 transition-all ${
+                  selectedMethod === "bank_transfer"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/50"
+                }`}
                 onClick={() => setSelectedMethod("bank_transfer")}
               >
                 <input
@@ -220,9 +343,12 @@ const SubscriptionPaymentPage: React.FC = () => {
                   className="mt-1"
                 />
                 <div className="flex-1">
-                  <h3 className="font-semibold text-foreground">
-                    {t("subscription.bankTransfer") || "Bank Transfer"}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Building className="h-5 w-5 text-muted-foreground" />
+                    <h3 className="font-semibold text-foreground">
+                      {t("subscription.bankTransfer") || "Bank Transfer"}
+                    </h3>
+                  </div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {t("subscription.bankTransferDesc") ||
                       "Transfer funds directly to our bank account"}
@@ -230,31 +356,40 @@ const SubscriptionPaymentPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Card Payment */}
-              <div
-                className="flex cursor-pointer items-start gap-4 rounded-lg border border-border p-4 transition-all hover:border-primary/50"
-                onClick={() => setSelectedMethod("card")}
-              >
-                <input
-                  type="radio"
-                  checked={selectedMethod === "card"}
-                  onChange={() => setSelectedMethod("card")}
-                  className="mt-1"
-                />
-                <div className="flex-1">
-                  <h3 className="font-semibold text-foreground">
-                    {t("subscription.cardPayment") || "Card Payment"}
-                  </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {t("subscription.cardPaymentDesc") ||
-                      "Pay with debit or credit card (coming soon)"}
-                  </p>
+              {/* PayPal Checkout */}
+              {selectedMethod === "paypal" && selectedPlan && (
+                <div className="mt-4 rounded-lg border border-primary/20 bg-card p-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      {t("subscription.totalAmount") || "Total Amount"}:
+                    </span>
+                    <span className="text-lg font-bold text-foreground">
+                      {selectedPlan.price} SAR
+                    </span>
+                  </div>
+                  
+                  {paymentError && (
+                    <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                      {paymentError}
+                    </div>
+                  )}
+
+                  <PayPalCheckout
+                    amount={selectedPlan.price}
+                    bookingMeta={{
+                      serviceId: `subscription_${selectedPlan.id}`,
+                      providerId: user?.uid || "",
+                    }}
+                    onAuthorized={handlePayPalAuthorized}
+                    onError={(message) => setPaymentError(message)}
+                  />
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
-          {/* Admin Contact Info */}
+          {/* Admin Contact Info - only show for bank transfer */}
+          {selectedMethod === "bank_transfer" && (
           <Card className="mb-8 border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/40">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg text-amber-900 dark:text-amber-100">
@@ -333,8 +468,30 @@ const SubscriptionPaymentPage: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+          )}
 
-          {/* Action Buttons */}
+          {/* Payment Success */}
+          {paymentSuccess && (
+            <Card className="mb-8 border-green-200 bg-green-50 dark:border-green-900/40 dark:bg-green-950/40">
+              <CardContent className="p-6 text-center">
+                <CheckCircle className="mx-auto h-16 w-16 text-green-500 mb-4" />
+                <h3 className="text-xl font-semibold text-green-900 dark:text-green-100 mb-2">
+                  {t("subscription.paymentSuccess") || "Payment Successful!"}
+                </h3>
+                <p className="text-sm text-green-700 dark:text-green-300 mb-4">
+                  {t("subscription.subscriptionActivated") || 
+                    "Your subscription has been activated. You now have full access to all provider features."}
+                </p>
+                <Button onClick={() => navigate("/provider")} className="gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  {t("subscription.goToDashboard") || "Go to Dashboard"}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Action Buttons - only show if not success */}
+          {!paymentSuccess && (
           <div className="flex gap-4">
             <Button
               variant="outline"
@@ -343,21 +500,25 @@ const SubscriptionPaymentPage: React.FC = () => {
             >
               {t("common.cancel")}
             </Button>
-            <Button
-              onClick={() => {
-                toast.info(
-                  t("subscription.contactAdminMessage") ||
-                    "Please contact the admin using the information above to complete your subscription payment.",
-                );
-              }}
-              className="flex-1 gap-2"
-            >
-              <CheckCircle className="h-4 w-4" />
-              {t("subscription.proceedToPayment") || "Proceed"}
-            </Button>
+            {selectedMethod === "bank_transfer" && (
+              <Button
+                onClick={() => {
+                  toast.info(
+                    t("subscription.contactAdminMessage") ||
+                      "Please contact the admin using the information above to complete your subscription payment.",
+                  );
+                }}
+                className="flex-1 gap-2"
+              >
+                <CheckCircle className="h-4 w-4" />
+                {t("subscription.proceedToPayment") || "Proceed"}
+              </Button>
+            )}
           </div>
+          )}
 
           {/* Info Banner */}
+          {!paymentSuccess && (
           <div className="mt-8 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/40 dark:bg-blue-950/40">
             <p className="text-sm text-blue-900 dark:text-blue-100">
               <span className="font-semibold">
@@ -367,6 +528,7 @@ const SubscriptionPaymentPage: React.FC = () => {
                 "Your subscription will activate immediately after payment is verified. You'll receive a confirmation email with your receipt."}
             </p>
           </div>
+          )}
         </motion.div>
       </main>
     </div>

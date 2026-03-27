@@ -924,7 +924,9 @@ export const verifySubscriptionPayment = async (
   }
 
   // Calculate new subscription end date based on plan
-  const endDate = new Date(now);
+  // Use payment date if provided, otherwise use current date
+  const startDate = paymentData?.date || now;
+  const endDate = new Date(startDate);
 
   // Map price to months: 10=1 month, 27=3 months, 96=12 months
   const priceToMonths: Record<number, number> = {
@@ -937,9 +939,11 @@ export const verifySubscriptionPayment = async (
   const months = priceToMonths[currentPrice] || 1;
   endDate.setMonth(endDate.getMonth() + months);
 
-  await updateDoc(providerRef, {
+  const updateData = {
+    uid: providerId,
+    displayName: profile.displayName || "Provider",
     subscriptionStatus: "ACTIVE",
-    subscriptionStartDate: serverTimestamp(),
+    subscriptionStartDate: startDate,
     subscriptionEndDate: endDate,
     lastPaymentDate: serverTimestamp(),
     paymentVerificationStatus: "VERIFIED",
@@ -952,7 +956,10 @@ export const verifySubscriptionPayment = async (
     lastSubscriptionPaymentAmount: paymentData?.amount || currentPrice,
     lastSubscriptionPaymentMethod: paymentData?.method || "BANK_TRANSFER",
     updatedAt: serverTimestamp(),
-  } as Record<string, unknown>);
+  } as Record<string, unknown>;
+
+  // Use setDoc with merge to handle both existing and new documents
+  await setDoc(providerRef, updateData, { merge: true });
 };
 
 // Update subscription status manually (admin action)

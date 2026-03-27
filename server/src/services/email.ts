@@ -128,4 +128,41 @@ export const emailTemplates = {
       </div>
     `,
   }),
+
+  // Admin notification for subscription payment
+  adminSubscriptionNotification: (
+    providerName: string,
+    providerEmail: string,
+    providerId: string,
+    planName: string,
+    planMonths: number,
+    amount: number,
+    orderId: string,
+    gateway: string,
+  ) => ({
+    subject: `🎉 New Subscription Payment: ${providerName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #28a745; margin-bottom: 20px;">💰 New Subscription Payment!</h1>
+        <p>A provider has just subscribed via ${gateway}!</p>
+        <div style="background-color: #f0fff0; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #28a745;">
+          <h3 style="margin-top: 0; color: #333;">Provider Details</h3>
+          <p><strong>Name:</strong> ${providerName}</p>
+          <p><strong>Email:</strong> ${providerEmail}</p>
+          <p><strong>ID:</strong> ${providerId}</p>
+        </div>
+        <div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #333;">Payment Details</h3>
+          <p><strong>Plan:</strong> ${planName} (${planMonths} month${planMonths > 1 ? 's' : ''})</p>
+          <p><strong>Amount:</strong> ${amount.toFixed(2)} SAR</p>
+          <p><strong>Gateway:</strong> ${gateway}</p>
+          <p><strong>Order ID:</strong> ${orderId}</p>
+          <p><strong>Time:</strong> ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' })} (Saudi Time)</p>
+        </div>
+        <p style="color: #666;">The subscription has been automatically activated.</p>
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+        <p style="color: #999; font-size: 12px;">Link Admin Notification System</p>
+      </div>
+    `,
+  }),
 };
