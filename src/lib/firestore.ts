@@ -1668,8 +1668,14 @@ export const createReview = async (
   }
 
   const reviewsRef = collection(db, COLLECTIONS.REVIEWS);
+  
+  // Filter out undefined values - Firestore doesn't accept undefined
+  const reviewData = Object.fromEntries(
+    Object.entries(review).filter(([, value]) => value !== undefined)
+  );
+  
   const docRef = await addDoc(reviewsRef, {
-    ...review,
+    ...reviewData,
     createdAt: serverTimestamp(),
   });
 
