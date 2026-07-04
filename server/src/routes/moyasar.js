@@ -92,6 +92,14 @@ router.get("/payment/:id", async (req, res) => {
 // Webhook handler for payment status updates
 router.post("/webhook", async (req, res) => {
   try {
+    // Verify the shared secret token Moyasar sends in the payload (configured
+    // when creating the webhook in the dashboard). Rejects spoofed calls.
+    const expectedToken = process.env.MOYASAR_WEBHOOK_SECRET;
+    if (expectedToken && req.body.secret_token !== expectedToken) {
+      console.warn("Moyasar webhook: invalid secret_token");
+      return res.status(401).json({ error: "Invalid webhook token" });
+    }
+
     const { id, status, amount, metadata } = req.body;
 
     console.log("Moyasar webhook received:", { id, status, amount, metadata });
@@ -115,6 +123,70 @@ router.post("/webhook", async (req, res) => {
     res.json({ received: true });
   } catch (error) {
     console.error("Moyasar webhook error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Capture an authorized (manual/hold) payment — charges the held funds.
+// Called when the provider ACCEPTS the booking.
+router.post("/capture/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount } = req.body; // Optional partial capture amount in SAR
+
+    const body = amount ? { amount: Math.round(Number(amount) * 100) } : {};
+
+    const response = await fetch(`${MOYASAR_API_BASE}/payments/${id}/capture`, {
+      method: "POST",
+      headers: {
+        Authorization: getAuthHeader(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("Moyasar capture error:", data);
+      return res
+        .status(response.status)
+        .json({ error: data.message || "Capture failed" });
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error("Moyasar capture error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Void an authorized (manual/hold) payment — releases the hold without charging.
+// Called when the provider REJECTS/cancels a still-authorized booking.
+router.post("/void/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const response = await fetch(`${MOYASAR_API_BASE}/payments/${id}/void`, {
+      method: "POST",
+      headers: {
+        Authorization: getAuthHeader(),
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("Moyasar void error:", data);
+      return res
+        .status(response.status)
+        .json({ error: data.message || "Void failed" });
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error("Moyasar void error:", error);
     res.status(500).json({ error: error.message });
   }
 });

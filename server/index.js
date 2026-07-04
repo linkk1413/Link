@@ -9,7 +9,30 @@ const moyasarRouter = require("./src/routes/moyasar");
 const app = express();
 const PORT = process.env.PORT || 4242;
 
-app.use(cors());
+// Restrict CORS to the configured client origin(s) in production. Falls back to
+// allow-all only when CLIENT_ORIGIN is unset (e.g. local dev).
+// Origins may be separated by "|" or "," (pipe avoids clashing with gcloud
+// --set-env-vars, which uses commas to separate variables).
+const allowedOrigins = (process.env.CLIENT_ORIGIN || "")
+  .split(/[|,]/)
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  cors(
+    allowedOrigins.length
+      ? {
+          origin: (origin, callback) => {
+            // Allow same-origin/non-browser requests (no Origin header).
+            if (!origin || allowedOrigins.includes(origin)) {
+              return callback(null, true);
+            }
+            return callback(new Error("Not allowed by CORS"));
+          },
+        }
+      : undefined,
+  ),
+);
 app.use(express.json());
 
 // Moyasar routes

@@ -69,7 +69,7 @@ export default function LandingPage() {
               alt="Link"
               className="h-10 w-10 rounded-lg object-cover"
             />
-          </div>
+            </div>
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
             <div className="flex items-center gap-2 rounded-full border border-border px-2 py-1">

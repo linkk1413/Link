@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -18,7 +18,12 @@ import { useProviderProfile } from "@/hooks/queries/useProviders";
 import { useCreateBooking } from "@/hooks/queries/useBookings";
 import { useCreatePayment } from "@/hooks/queries/usePayments";
 import { useAuth } from "@/contexts/AuthContext";
-import PayPalCheckout from "@/components/payments/PayPalCheckout";
+import MoyasarCheckout from "@/components/payments/MoyasarCheckout";
+import {
+  finalizeMoyasarBooking,
+  MOYASAR_DRAFT_KEY,
+  type MoyasarBookingDraft,
+} from "@/lib/finalizeMoyasarBooking";
 import { toast } from "@/components/ui/sonner";
 
 // Generate time slots
@@ -79,115 +84,99 @@ const BookingPage: React.FC = () => {
     setShowConfirmation(true);
   };
 
-  const handlePayPalAuthorized = async (payload: {
-    orderId: string;
-    authorizationId: string;
-    amountUsd: number;
-    fxRate: number;
+  const apiBaseUrl =
+    import.meta.env.VITE_MOYASAR_API_BASE_URL ||
+    import.meta.env.VITE_PAYPAL_API_BASE_URL ||
+    "";
+
+  // Guards the finalize handler against running twice (double click / retry).
+  const finalizingRef = useRef(false);
+
+  // Build the booking draft from the current selection (null if incomplete).
+  const buildDraft = (): MoyasarBookingDraft | null => {
+    if (!service || !selectedDate || !selectedTime || !selectedLocation || !user) {
+      return null;
+    }
+    const [hours, minutes] = selectedTime.split(":").map(Number);
+    const startAt = new Date(selectedDate);
+    startAt.setHours(hours, minutes, 0, 0);
+    const endAt = new Date(startAt);
+    endAt.setMinutes(endAt.getMinutes() + service.durationMin);
+
+    return {
+      clientId: user.uid,
+      providerId: service.providerId,
+      serviceId: service.id,
+      serviceName: service.title,
+      providerName: provider?.name || "Provider",
+      clientName: user.displayName || user.email?.split("@")[0] || "",
+      clientEmail: user.email || "",
+      startAt: startAt.toISOString(),
+      endAt: endAt.toISOString(),
+      bookingDate: startAt.toISOString().split("T")[0],
+      priceTotal: service.price,
+      locationType: selectedLocation,
+      addressText:
+        selectedLocation === "AT_PROVIDER"
+          ? t("services.atProvider")
+          : t("services.atClient"),
+      lang: i18n.language,
+    };
+  };
+
+  // Persist the draft before payment so it survives the 3-D Secure redirect
+  // (where PaymentCallbackPage finalizes the booking).
+  useEffect(() => {
+    if (!showConfirmation || bookingSuccess) return;
+    const draft = buildDraft();
+    if (draft) {
+      sessionStorage.setItem(MOYASAR_DRAFT_KEY, JSON.stringify(draft));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showConfirmation, selectedDate, selectedTime, selectedLocation, service, user, provider]);
+
+  // Minimal metadata attached to the Moyasar payment for traceability.
+  const moyasarMetadata = useMemo<Record<string, string> | undefined>(
+    () =>
+      service && user
+        ? {
+            serviceId: service.id,
+            providerId: service.providerId,
+            clientId: user.uid,
+          }
+        : undefined,
+    [service, user],
+  );
+
+  // Fallback finalize path for non-3DS cards (on_completed fires in-page).
+  // 3DS cards are finalized by PaymentCallbackPage instead.
+  const handleMoyasarSuccess = async (payload: {
+    paymentId: string;
+    status: string;
   }) => {
-    if (
-      !service ||
-      !selectedDate ||
-      !selectedTime ||
-      !selectedLocation ||
-      !user
-    ) {
+    if (finalizingRef.current) return;
+    const draft = buildDraft();
+    if (!draft) {
       setPaymentError(t("booking.validationError"));
       return;
     }
 
+    finalizingRef.current = true;
     setIsPaying(true);
     setPaymentError(null);
 
-    // Create start date/time
-    const [hours, minutes] = selectedTime.split(":").map(Number);
-    const startAt = new Date(selectedDate);
-    startAt.setHours(hours, minutes, 0, 0);
-
-    // Calculate end time
-    const endAt = new Date(startAt);
-    endAt.setMinutes(endAt.getMinutes() + service.durationMin);
-
     try {
-      const bookingId = await createBookingMutation.mutateAsync({
-        clientId: user.uid,
-        providerId: service.providerId,
-        serviceId: service.id,
-        startAt,
-        endAt,
-        bookingDate: startAt.toISOString().split("T")[0], // "YYYY-MM-DD"
-        status: "PENDING",
-        priceTotal: service.price,
-        depositAmount: 0,
-        locationType: selectedLocation,
-        clientName: user.displayName || user.email?.split("@")[0] || "",
-        serviceName: service.title,
-        addressText:
-          selectedLocation === "AT_PROVIDER"
-            ? t("services.atProvider")
-            : t("services.atClient"),
+      await finalizeMoyasarBooking({
+        apiBaseUrl,
+        paymentId: payload.paymentId,
+        draft,
       });
-
-      await createPaymentMutation.mutateAsync({
-        bookingId,
-        clientId: user.uid,
-        providerId: service.providerId,
-        payType: "FULL",
-        status: "AUTHORIZED",
-        gateway: "PAYPAL",
-        amount: service.price,
-        currency: "SAR",
-        amountSar: service.price,
-        amountUsd: payload.amountUsd,
-        fxRate: payload.fxRate,
-        orderId: payload.orderId,
-        authorizationId: payload.authorizationId,
-        platformFee: 0,
-        gatewayFee: 0,
-        providerAmount: service.price,
-      });
-
-      // Send booking confirmation email
-      try {
-        const dateStr = startAt.toLocaleDateString(
-          i18n.language === "ar" ? "ar-SA" : "en-US",
-          {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          },
-        );
-        const timeStr = startAt.toLocaleTimeString(
-          i18n.language === "ar" ? "ar-SA" : "en-US",
-          {
-            hour: "2-digit",
-            minute: "2-digit",
-          },
-        );
-
-        const apiBaseUrl = import.meta.env.VITE_PAYPAL_API_BASE_URL || "";
-        await fetch(`${apiBaseUrl}/api/auth/send-booking-confirmation`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clientEmail: user.email,
-            clientName: user.displayName || user.email.split("@")[0],
-            providerName: provider?.name || "Provider",
-            serviceName: service.title,
-            date: dateStr,
-            time: timeStr,
-          }),
-        });
-      } catch (emailError) {
-        // Non-blocking: Email failure doesn't prevent booking
-        console.error("Failed to send booking confirmation email:", emailError);
-      }
-
+      sessionStorage.removeItem(MOYASAR_DRAFT_KEY);
       setBookingSuccess(true);
     } catch (error) {
       console.error("Failed to finalize booking:", error);
-      setPaymentError(t("common.error"));
+      setPaymentError(error instanceof Error ? error.message : t("common.error"));
+      finalizingRef.current = false;
     } finally {
       setIsPaying(false);
     }
@@ -538,13 +527,10 @@ const BookingPage: React.FC = () => {
                   </div>
                 )}
 
-                <PayPalCheckout
+                <MoyasarCheckout
                   amount={service.price}
-                  bookingMeta={{
-                    serviceId: service.id,
-                    providerId: service.providerId,
-                  }}
-                  onAuthorized={handlePayPalAuthorized}
+                  metadata={moyasarMetadata}
+                  onSuccess={handleMoyasarSuccess}
                   onError={(message) => setPaymentError(message)}
                 />
 

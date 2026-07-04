@@ -108,7 +108,15 @@ service cloud.firestore {
         && bookingDoc(request.resource.data.bookingId).data.clientId == request.auth.uid
         && bookingDoc(request.resource.data.bookingId).data.providerId == request.resource.data.providerId
         && request.resource.data.amountSar == bookingDoc(request.resource.data.bookingId).data.priceTotal;
-      allow update, delete: if isAdmin();
+      // Provider may settle their own held payment: only status/captureId may
+      // change (the actual capture/void is performed server-side with the
+      // secret key before this write).
+      allow update: if isAdmin() || (
+        signedIn()
+        && resource.data.providerId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'captureId'])
+      );
+      allow delete: if isAdmin();
     }
 
     match /chats/{chatId} {

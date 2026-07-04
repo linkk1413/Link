@@ -1508,6 +1508,45 @@ export const updatePayment = async (
   });
 };
 
+// Fetch the payment record for a booking (used to capture/void on accept/reject).
+// providerId must match the signed-in provider to satisfy Firestore read rules.
+export const getPaymentByBooking = async (
+  bookingId: string,
+  providerId: string,
+): Promise<(Payment & { id: string }) | null> => {
+  const paymentsRef = collection(db, COLLECTIONS.PAYMENTS);
+  const q = query(
+    paymentsRef,
+    where("providerId", "==", providerId),
+    where("bookingId", "==", bookingId),
+    limit(1),
+  );
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  const docSnap = snapshot.docs[0];
+  return { ...(docSnap.data() as Payment), id: docSnap.id };
+};
+
+// Fetch a payment by its gateway order/charge id — used to de-duplicate booking
+// finalization across the on_completed callback and the 3-D Secure redirect.
+// clientId must match the signed-in client to satisfy Firestore read rules.
+export const getPaymentByOrderId = async (
+  orderId: string,
+  clientId: string,
+): Promise<(Payment & { id: string }) | null> => {
+  const paymentsRef = collection(db, COLLECTIONS.PAYMENTS);
+  const q = query(
+    paymentsRef,
+    where("clientId", "==", clientId),
+    where("orderId", "==", orderId),
+    limit(1),
+  );
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  const docSnap = snapshot.docs[0];
+  return { ...(docSnap.data() as Payment), id: docSnap.id };
+};
+
 // ============================================
 // REVIEWS
 // ============================================

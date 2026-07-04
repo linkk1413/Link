@@ -36,6 +36,7 @@ import {
   useUpdateBookingStatus,
 } from "@/hooks/queries/useBookings";
 import { useProviderBanner } from "@/hooks/queries/useBanner";
+import { getPaymentByBooking, updatePayment } from "@/lib/firestore";
 import { toast } from "@/components/ui/sonner";
 import logo from "@/assets/logo.jpeg";
 import { Booking } from "@/types";
@@ -90,19 +91,89 @@ const ProviderDashboardPage: React.FC = () => {
     setDialogOpen(true);
   };
 
-  const confirmAction = async () => {
-    if (!selectedBooking || !actionType) return;
+  const apiBaseUrl =
+    import.meta.env.VITE_MOYASAR_API_BASE_URL ||
+    import.meta.env.VITE_PAYPAL_API_BASE_URL ||
+    "";
 
+  // Local guard so the money operation can't be double-submitted (the mutation's
+  // isPending only covers the Firestore write, not the capture/void fetch).
+  const [processingAction, setProcessingAction] = useState(false);
+
+  const confirmAction = async () => {
+    if (!selectedBooking || !actionType || processingAction) return;
+
+    setProcessingAction(true);
     try {
-      await updateStatusMutation.mutateAsync({
-        id: selectedBooking.id,
-        status: actionType === "accept" ? "ACCEPTED" : "REJECTED",
-      });
+      const payment = user
+        ? await getPaymentByBooking(selectedBooking.id, user.uid)
+        : null;
+      const isMoyasar = payment?.gateway === "MOYASAR";
+      const isHold = isMoyasar && payment?.status === "AUTHORIZED";
+      const isCaptured = isMoyasar && payment?.status === "CAPTURED";
+
+      if (actionType === "accept") {
+        // Immediate-capture payments are already charged — nothing to do.
+        // If holds are ever enabled, capture the funds FIRST and only confirm
+        // the booking if it succeeds.
+        if (isHold && payment) {
+          const res = await fetch(
+            `${apiBaseUrl}/moyasar/capture/${payment.orderId}`,
+            { method: "POST" },
+          );
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || "Failed to charge the client");
+          }
+          await updatePayment(payment.id, {
+            status: "CAPTURED",
+            captureId: payment.orderId,
+          });
+        }
+        await updateStatusMutation.mutateAsync({
+          id: selectedBooking.id,
+          status: "ACCEPTED",
+        });
+      } else {
+        // Reject: return the client's money, then mark the booking rejected.
+        // Captured payments are refunded; a still-held payment is voided.
+        await updateStatusMutation.mutateAsync({
+          id: selectedBooking.id,
+          status: "REJECTED",
+        });
+        if ((isCaptured || isHold) && payment) {
+          const endpoint = isCaptured ? "refund" : "void";
+          const nextStatus = isCaptured ? "REFUNDED" : "VOIDED";
+          try {
+            const res = await fetch(
+              `${apiBaseUrl}/moyasar/${endpoint}/${payment.orderId}`,
+              { method: "POST" },
+            );
+            if (res.ok) {
+              await updatePayment(payment.id, { status: nextStatus });
+            } else {
+              console.error(`Moyasar ${endpoint} failed`, await res.text());
+              toast.error(t("common.error"), {
+                description: t("payment.paymentFailed"),
+              });
+            }
+          } catch (refundError) {
+            console.error(`Moyasar ${endpoint} error:`, refundError);
+          }
+        }
+      }
+
       setDialogOpen(false);
       setSelectedBooking(null);
       setActionType(null);
     } catch (error) {
       console.error("Failed to update booking:", error);
+      toast.error(t("common.error"), {
+        description:
+          error instanceof Error ? error.message : t("common.error"),
+      });
+    } finally {
+      setProcessingAction(false);
     }
   };
 
@@ -575,7 +646,7 @@ const ProviderDashboardPage: React.FC = () => {
             <Button
               variant={actionType === "reject" ? "destructive" : "default"}
               onClick={confirmAction}
-              disabled={updateStatusMutation.isPending}
+              disabled={updateStatusMutation.isPending || processingAction}
             >
               {actionType === "accept"
                 ? t("dashboard.accept")

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CreditCard, Loader2, Apple, Smartphone } from "lucide-react";
+import { CreditCard, Loader2, Apple } from "lucide-react";
 
 type MoyasarCheckoutProps = {
   amount: number; // Amount in SAR
@@ -28,10 +28,16 @@ interface MoyasarConfig {
   publishable_api_key: string;
   callback_url: string;
   methods: string[];
+  metadata?: Record<string, string>;
+  // Authorize-only (hold) config per method — capture happens later server-side.
+  credit_card?: {
+    manual?: boolean;
+  };
   apple_pay?: {
     country: string;
     label: string;
     validate_merchant_url: string;
+    manual?: boolean;
   };
   on_completed?: (payment: MoyasarPayment) => void;
   on_failure?: (error: Error) => void;
@@ -62,10 +68,17 @@ const MoyasarCheckout: React.FC<MoyasarCheckoutProps> = ({
   const moyasarRef = useRef<HTMLDivElement>(null);
   const isArabic = i18n.language === "ar";
 
+  // Guards against the success handler running twice (e.g. double click / retry).
+  const completedRef = useRef(false);
+
   const publishableKey = import.meta.env.VITE_MOYASAR_PUBLISHABLE_KEY;
   const callbackUrl =
     import.meta.env.VITE_MOYASAR_CALLBACK_URL ||
     `${window.location.origin}/client/payment-callback`;
+  const apiBaseUrl =
+    import.meta.env.VITE_MOYASAR_API_BASE_URL ||
+    import.meta.env.VITE_PAYPAL_API_BASE_URL ||
+    "";
 
   useEffect(() => {
     // Load Moyasar script
@@ -113,8 +126,6 @@ const MoyasarCheckout: React.FC<MoyasarCheckoutProps> = ({
     moyasarRef.current.innerHTML = "";
 
     try {
-      const apiBaseUrl = import.meta.env.VITE_PAYPAL_API_BASE_URL || "";
-
       window.Moyasar.init({
         element: ".moyasar-form",
         amount: Math.round(amount * 100), // Convert to halalas
@@ -122,18 +133,34 @@ const MoyasarCheckout: React.FC<MoyasarCheckoutProps> = ({
         description: "Booking Payment",
         publishable_api_key: publishableKey,
         callback_url: callbackUrl,
-        methods: ["creditcard", "applepay", "stcpay"],
+        metadata,
+        // Immediate capture: the client is charged now. On provider reject the
+        // payment is refunded (see ProviderDashboardPage). Switch to manual
+        // (hold) once Moyasar enables Authorize & Capture on the live account.
+        methods: ["creditcard", "applepay"],
         apple_pay: {
           country: "SA",
           label: "Link Booking",
           validate_merchant_url: `${apiBaseUrl}/moyasar/apple-pay-session`,
         },
         on_completed: async (payment: MoyasarPayment) => {
-          if (payment.status === "paid") {
-            await onSuccess({
-              paymentId: payment.id,
-              status: payment.status,
-            });
+          // Non-3DS cards resolve here; 3DS cards redirect to callback_url
+          // instead (handled by PaymentCallbackPage). Guard against double runs.
+          if (completedRef.current) return;
+          const ok = ["authorized", "paid", "captured"].includes(
+            payment.status,
+          );
+          if (ok) {
+            completedRef.current = true;
+            try {
+              await onSuccess({
+                paymentId: payment.id,
+                status: payment.status,
+              });
+            } catch (err) {
+              completedRef.current = false;
+              throw err;
+            }
           } else {
             onError?.(t("payment.paymentNotCompleted"));
           }
@@ -154,6 +181,8 @@ const MoyasarCheckout: React.FC<MoyasarCheckoutProps> = ({
     amount,
     publishableKey,
     callbackUrl,
+    apiBaseUrl,
+    metadata,
     onSuccess,
     onError,
     t,
@@ -196,10 +225,6 @@ const MoyasarCheckout: React.FC<MoyasarCheckoutProps> = ({
         <div className="flex items-center gap-1">
           <Apple className="h-4 w-4" />
           <span>Apple Pay</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <Smartphone className="h-4 w-4" />
-          <span>STC Pay</span>
         </div>
       </div>
 
