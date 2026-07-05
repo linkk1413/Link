@@ -54,6 +54,7 @@ import ProviderProfilePage from "@/pages/provider/ProviderProfilePage";
 import ProviderBookingDetailsPage from "@/pages/provider/ProviderBookingDetailsPage";
 import ProviderWalletPage from "@/pages/provider/ProviderWalletPage";
 import SubscriptionPaymentPage from "@/pages/provider/SubscriptionPaymentPage";
+import SubscriptionCallbackPage from "@/pages/provider/SubscriptionCallbackPage";
 import ProviderReviewsPage from "@/pages/provider/ProviderReviewsPage";
 
 // Admin pages
@@ -179,6 +180,10 @@ const AppRoutes = () => {
         <Route path="profile" element={<ProviderProfilePage />} />
         <Route path="reviews" element={<ProviderReviewsPage />} />
         <Route path="subscription" element={<SubscriptionPaymentPage />} />
+        <Route
+          path="subscription/callback"
+          element={<SubscriptionCallbackPage />}
+        />
       </Route>
 
       {/* Admin routes */}

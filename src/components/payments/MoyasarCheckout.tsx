@@ -10,6 +10,10 @@ type MoyasarCheckoutProps = {
   onSuccess: (payload: { paymentId: string; status: string }) => Promise<void>;
   onError?: (message: string) => void;
   metadata?: Record<string, string>;
+  // Where Moyasar redirects after 3-D Secure. Defaults to the booking callback.
+  callbackUrl?: string;
+  // Text shown on the Moyasar payment. Defaults to "Booking Payment".
+  description?: string;
 };
 
 declare global {
@@ -61,6 +65,8 @@ const MoyasarCheckout: React.FC<MoyasarCheckoutProps> = ({
   onSuccess,
   onError,
   metadata,
+  callbackUrl: callbackUrlProp,
+  description,
 }) => {
   const { t, i18n } = useTranslation();
   const [isLoading, setIsLoading] = useState(true);
@@ -73,6 +79,7 @@ const MoyasarCheckout: React.FC<MoyasarCheckoutProps> = ({
 
   const publishableKey = import.meta.env.VITE_MOYASAR_PUBLISHABLE_KEY;
   const callbackUrl =
+    callbackUrlProp ||
     import.meta.env.VITE_MOYASAR_CALLBACK_URL ||
     `${window.location.origin}/client/payment-callback`;
   const apiBaseUrl =
@@ -130,7 +137,7 @@ const MoyasarCheckout: React.FC<MoyasarCheckoutProps> = ({
         element: ".moyasar-form",
         amount: Math.round(amount * 100), // Convert to halalas
         currency: "SAR",
-        description: "Booking Payment",
+        description: description || "Booking Payment",
         publishable_api_key: publishableKey,
         callback_url: callbackUrl,
         metadata,
@@ -183,6 +190,7 @@ const MoyasarCheckout: React.FC<MoyasarCheckoutProps> = ({
     callbackUrl,
     apiBaseUrl,
     metadata,
+    description,
     onSuccess,
     onError,
     t,

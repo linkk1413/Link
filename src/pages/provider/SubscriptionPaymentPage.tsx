@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -19,9 +19,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscriptionSettings } from "@/hooks/queries/useSubscriptionSettings";
-import PayPalCheckout from "@/components/payments/PayPalCheckout";
-import { doc, updateDoc, Timestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import MoyasarCheckout from "@/components/payments/MoyasarCheckout";
+import {
+  finalizeMoyasarSubscription,
+  MOYASAR_SUB_DRAFT_KEY,
+  type MoyasarSubscriptionDraft,
+} from "@/lib/finalizeMoyasarSubscription";
 
 // Default admin contact info (fallback if not set in database)
 const DEFAULT_CONTACT = {
@@ -36,7 +39,7 @@ const SubscriptionPaymentPage: React.FC = () => {
   const { user } = useAuth();
   const isArabic = i18n.language === "ar";
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
-  const [selectedMethod, setSelectedMethod] = useState<"paypal" | "bank_transfer">("paypal");
+  const [selectedMethod, setSelectedMethod] = useState<"card" | "bank_transfer">("card");
   const [isPaying, setIsPaying] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -99,73 +102,90 @@ const SubscriptionPaymentPage: React.FC = () => {
     }
   }, [plans, selectedPlanId]);
 
-  // Handle PayPal payment success
-  const handlePayPalAuthorized = async (payload: {
-    orderId: string;
-    authorizationId: string;
-    amountUsd: number;
-    fxRate: number;
+  const apiBaseUrl =
+    import.meta.env.VITE_MOYASAR_API_BASE_URL ||
+    import.meta.env.VITE_PAYPAL_API_BASE_URL ||
+    "https://server-link-190979667993.europe-west3.run.app";
+
+  // Where Moyasar returns after 3-D Secure (its own callback, not the booking one).
+  const subscriptionCallbackUrl = `${window.location.origin}/provider/subscription/callback`;
+
+  // Guards the finalize handler against running twice (double click / retry).
+  const finalizingRef = useRef(false);
+
+  const buildSubDraft = (): MoyasarSubscriptionDraft | null => {
+    if (!user || !selectedPlan) return null;
+    return {
+      uid: user.uid,
+      planId: selectedPlan.id,
+      planName: selectedPlan.name,
+      planMonths: selectedPlan.months,
+      price: selectedPlan.price,
+      providerName: user.name || user.email?.split("@")[0] || "",
+      providerEmail: user.email || "",
+      lang: i18n.language,
+    };
+  };
+
+  // Persist the draft before payment so it survives the 3-D Secure redirect
+  // (where SubscriptionCallbackPage activates the subscription).
+  useEffect(() => {
+    if (selectedMethod !== "card" || paymentSuccess) return;
+    const draft = buildSubDraft();
+    if (draft) {
+      sessionStorage.setItem(MOYASAR_SUB_DRAFT_KEY, JSON.stringify(draft));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMethod, selectedPlan, user, paymentSuccess]);
+
+  const moyasarMetadata = useMemo<Record<string, string> | undefined>(
+    () =>
+      user && selectedPlan
+        ? {
+            type: "subscription",
+            providerId: user.uid,
+            planId: selectedPlan.id,
+            planMonths: String(selectedPlan.months),
+          }
+        : undefined,
+    [user, selectedPlan],
+  );
+
+  // Fallback finalize for non-3DS cards (on_completed fires in-page).
+  // 3DS cards are finalized by SubscriptionCallbackPage instead.
+  const handleMoyasarSuccess = async (payload: {
+    paymentId: string;
+    status: string;
   }) => {
-    if (!user || !selectedPlan) {
+    if (finalizingRef.current) return;
+    const draft = buildSubDraft();
+    if (!draft) {
       setPaymentError(t("common.error"));
       return;
     }
 
+    finalizingRef.current = true;
     setIsPaying(true);
     setPaymentError(null);
 
     try {
-      // Calculate subscription end date
-      const now = new Date();
-      const endDate = new Date(now);
-      endDate.setMonth(endDate.getMonth() + selectedPlan.months);
-
-      const subscriptionData = {
-        subscriptionStatus: "active",
-        subscriptionStartDate: Timestamp.fromDate(now),
-        subscriptionEndDate: Timestamp.fromDate(endDate),
-        subscriptionPlanId: selectedPlan.id,
-        subscriptionPlanMonths: selectedPlan.months,
-        lastPaymentDate: Timestamp.fromDate(now),
-        lastPaymentAmount: selectedPlan.price,
-        lastPaymentGateway: "PAYPAL",
-        lastPaymentOrderId: payload.orderId,
-        lastPaymentAuthorizationId: payload.authorizationId,
-        accountStatus: "ACTIVE",
-        isSubscribed: true,
-      };
-
-      // Update BOTH users and providers collections (banner reads from providers)
-      const userRef = doc(db, "users", user.uid);
-      const providerRef = doc(db, "providers", user.uid);
-      
-      await Promise.all([
-        updateDoc(userRef, subscriptionData),
-        updateDoc(providerRef, subscriptionData),
-      ]);
-
-      // Notify admin about the subscription payment (fire and forget)
-      const serverUrl = import.meta.env.VITE_SERVER_URL || "https://server-link-190979667993.europe-west3.run.app";
-      fetch(`${serverUrl}/api/email/notify-admin-subscription`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          providerName: user.name,
-          providerEmail: user.email,
-          providerId: user.uid,
-          planName: selectedPlan.name,
-          planMonths: selectedPlan.months,
-          amount: selectedPlan.price,
-          orderId: payload.orderId,
-          gateway: "PayPal",
-        }),
-      }).catch((err) => console.warn("Admin notification failed:", err));
-
+      await finalizeMoyasarSubscription({
+        apiBaseUrl,
+        paymentId: payload.paymentId,
+        draft,
+      });
+      sessionStorage.removeItem(MOYASAR_SUB_DRAFT_KEY);
       setPaymentSuccess(true);
-      toast.success(t("subscription.paymentSuccess") || "Payment successful! Your subscription is now active.");
+      toast.success(
+        t("subscription.paymentSuccess") ||
+          "Payment successful! Your subscription is now active.",
+      );
     } catch (error) {
       console.error("Failed to activate subscription:", error);
-      setPaymentError(t("common.error"));
+      setPaymentError(
+        error instanceof Error ? error.message : t("common.error"),
+      );
+      finalizingRef.current = false;
     } finally {
       setIsPaying(false);
     }
@@ -308,28 +328,28 @@ const SubscriptionPaymentPage: React.FC = () => {
               {/* PayPal Payment */}
               <div
                 className={`flex cursor-pointer items-start gap-4 rounded-lg border p-4 transition-all ${
-                  selectedMethod === "paypal"
+                  selectedMethod === "card"
                     ? "border-primary bg-primary/5"
                     : "border-border hover:border-primary/50"
                 }`}
-                onClick={() => setSelectedMethod("paypal")}
+                onClick={() => setSelectedMethod("card")}
               >
                 <input
                   type="radio"
-                  checked={selectedMethod === "paypal"}
-                  onChange={() => setSelectedMethod("paypal")}
+                  checked={selectedMethod === "card"}
+                  onChange={() => setSelectedMethod("card")}
                   className="mt-1"
                 />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <CreditCard className="h-5 w-5 text-primary" />
                     <h3 className="font-semibold text-foreground">
-                      {t("subscription.paypalPayment") || "PayPal / Card Payment"}
+                      {t("subscription.cardPayment") || "Card / Mada / Apple Pay"}
                     </h3>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {t("subscription.paypalPaymentDesc") ||
-                      "Pay instantly with PayPal or debit/credit card"}
+                    {t("subscription.cardPaymentDesc") ||
+                      "Pay instantly with Mada, Visa, Mastercard or Apple Pay"}
                   </p>
                 </div>
               </div>
@@ -363,8 +383,8 @@ const SubscriptionPaymentPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* PayPal Checkout */}
-              {selectedMethod === "paypal" && selectedPlan && (
+              {/* Moyasar Checkout */}
+              {selectedMethod === "card" && selectedPlan && (
                 <div className="mt-4 rounded-lg border border-primary/20 bg-card p-4">
                   <div className="mb-4 flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">
@@ -374,20 +394,19 @@ const SubscriptionPaymentPage: React.FC = () => {
                       {selectedPlan.price} SAR
                     </span>
                   </div>
-                  
+
                   {paymentError && (
                     <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
                       {paymentError}
                     </div>
                   )}
 
-                  <PayPalCheckout
+                  <MoyasarCheckout
                     amount={selectedPlan.price}
-                    bookingMeta={{
-                      serviceId: `subscription_${selectedPlan.id}`,
-                      providerId: user?.uid || "",
-                    }}
-                    onAuthorized={handlePayPalAuthorized}
+                    description={`Subscription: ${selectedPlan.name}`}
+                    callbackUrl={subscriptionCallbackUrl}
+                    metadata={moyasarMetadata}
+                    onSuccess={handleMoyasarSuccess}
                     onError={(message) => setPaymentError(message)}
                   />
                 </div>
