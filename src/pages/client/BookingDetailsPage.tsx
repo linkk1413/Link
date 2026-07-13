@@ -42,6 +42,7 @@ import { useReviewByBooking } from "@/hooks/queries/useReviews";
 import { ReviewDialog } from "@/components/ReviewDialog";
 import { StarRating } from "@/components/StarRating";
 import { BookingStatus } from "@/types";
+import { formatLocation } from "@/lib/saudiLocations";
 
 const getStatusBadgeVariant = (status: BookingStatus) => {
   switch (status) {
@@ -273,9 +274,7 @@ const BookingDetailsPage: React.FC = () => {
                       </p>
                       {(provider?.city || provider?.area) && (
                         <p className="text-sm text-muted-foreground">
-                          {[provider.city, provider.area]
-                            .filter(Boolean)
-                            .join(", ")}
+                          {formatLocation(provider, isArabic)}
                         </p>
                       )}
                     </>

@@ -476,6 +476,11 @@
     "emailVerificationRequiredTitle": "Verify your email",
     "emailVerificationRequiredDescription": "Please verify your email address before creating services. Check your inbox for the verification link.",
     "resendVerificationEmail": "Resend verification email",
+    "subscriptionRequiredTitle": "Subscription required",
+    "subscriptionRequiredDescription": "Subscribe to add or edit your services.",
+    "servicesHiddenDescription": "Your subscription has ended, so your services are hidden from clients and you can't add new ones. They will be restored automatically when you renew.",
+    "hiddenBySubscription": "Hidden — subscription ended",
+    "hiddenBySubscriptionHint": "This service was hidden automatically when your subscription ended. Renew to restore it.",
     "inactive": "Inactive",
     "atProvider": "At my location",
     "atClient": "At client's location",
@@ -489,8 +494,10 @@
     "customCategory": "Custom category",
     "customCategoryPlaceholder": "Type a category name",
     "price": "Price (SAR)",
-    "duration": "Duration (minutes)",
-    "durationHint": "How long does this service typically take?",
+    "duration": "Duration (hours)",
+    "durationPlaceholder": "e.g. 2 hours",
+    "durationHint": "Write the duration in hours, in numbers or words — e.g. 1.5 or \"two hours\".",
+    "hourUnit": "hour",
     "locationType": "Service location",
     "validationError": "Please fill all required fields correctly.",
     "errors": {
@@ -499,7 +506,7 @@
       "categoryRequired": "Please select a category",
       "customCategoryRequired": "Please enter a custom category name",
       "priceRequired": "Price is required (min 1 SAR)",
-      "durationRequired": "Duration is required (min 15 minutes)"
+      "durationRequired": "Duration is required"
     },
     "deleteTitle": "Delete service?",
     "deleteDescription": "This action cannot be undone. This will permanently delete the service.",
@@ -562,8 +569,11 @@
       "verifications": "Verifications",
       "payouts": "Payouts",
       "subscriptions": "Subscriptions",
-      "reports": "Reports"
+      "reports": "Reports",
+      "reviews": "Reviews"
     },
+    "copied": "{{field}} copied",
+    "noBankDetails": "This provider hasn't added bank details yet — ask her to complete them in her profile before transferring.",
     "usersManagement": "Users Management",
     "usersDescription": "View and manage all users in the platform",
     "searchUsers": "Search by name or email...",
@@ -980,6 +990,34 @@
     "flagReview": "Report Review",
     "reportProvider": "Report Provider",
     "reportUser": "Report User"
+  },
+  "adminReviews": {
+    "title": "Reviews Management",
+    "subtitle": "Review and remove client ratings or provider replies",
+    "searchPlaceholder": "Search by client, service, or comment",
+    "withReply": "With reply",
+    "lowRated": "Low rated (1–2)",
+    "noReviews": "No reviews",
+    "anonymous": "Anonymous client",
+    "providerReply": "Provider reply",
+    "deleteReview": "Delete review",
+    "deleteReply": "Delete reply",
+    "deleteReviewTitle": "Delete this review?",
+    "deleteReviewDescription": "The client's rating and comment will be permanently deleted and the provider's rating recalculated.",
+    "deleteReplyTitle": "Delete the provider's reply?",
+    "deleteReplyDescription": "Only the provider's reply is removed. The client's review and rating stay as they are.",
+    "reviewDeleted": "Review deleted",
+    "replyDeleted": "Reply deleted",
+    "noComment": "No comment"
+  },
+  "support": {
+    "title": "Customer support",
+    "email": "Email",
+    "phone": "Phone",
+    "whatsapp": "WhatsApp",
+    "whatsappAction": "Chat with us",
+    "helpCenter": "Help Center",
+    "unavailable": "Support contact details haven't been added yet."
   },
   "block": {
     "block": "Block",

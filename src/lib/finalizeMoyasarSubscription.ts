@@ -9,6 +9,7 @@
 
 import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { reactivateProviderServices } from "@/lib/firestore";
 
 export interface MoyasarSubscriptionDraft {
   uid: string;
@@ -92,7 +93,8 @@ export async function finalizeMoyasarSubscription(params: {
   endDate.setMonth(endDate.getMonth() + draft.planMonths);
 
   const subscriptionData = {
-    subscriptionStatus: "active",
+    // Uppercase: every reader (rules, banner, service gating) compares to "ACTIVE".
+    subscriptionStatus: "ACTIVE",
     subscriptionStartDate: Timestamp.fromDate(now),
     subscriptionEndDate: Timestamp.fromDate(endDate),
     subscriptionPlanId: draft.planId,
@@ -104,6 +106,7 @@ export async function finalizeMoyasarSubscription(params: {
     lastPaymentAuthorizationId: paymentId,
     accountStatus: "ACTIVE",
     isSubscribed: true,
+    wasOnTrial: false,
   };
 
   // 4. Activate on both docs (banner reads from providers).
@@ -112,7 +115,14 @@ export async function finalizeMoyasarSubscription(params: {
     updateDoc(providerRef, subscriptionData),
   ]);
 
-  // 5. Notify admin (non-blocking).
+  // 5. Restore the ads that were auto-hidden when the subscription lapsed.
+  try {
+    await reactivateProviderServices(draft.uid);
+  } catch (err) {
+    console.warn("Failed to restore services after renewal:", err);
+  }
+
+  // 6. Notify admin (non-blocking).
   try {
     await fetch(`${apiBaseUrl}/api/email/notify-admin-subscription`, {
       method: "POST",

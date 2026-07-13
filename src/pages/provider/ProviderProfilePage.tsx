@@ -61,6 +61,7 @@ import {
 import { db, auth } from "@/lib/firebase";
 import { sendEmailVerification } from "firebase/auth";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { SupportContactCard } from "@/components/SupportContactCard";
 import {
   useProviderProfile,
   useUpdateProviderProfile,
@@ -330,6 +331,12 @@ const ProviderProfilePage: React.FC = () => {
       bio: providerProfile?.bio || "",
       latitude: providerProfile?.latitude,
       longitude: providerProfile?.longitude,
+      // Bank fields must be restored too, otherwise cancelling an edit blanks
+      // them in the form and the next save wipes the stored account details.
+      bankAccountHolder: providerProfile?.bankAccountHolder || "",
+      bankName: providerProfile?.bankName || "",
+      bankAccountNumber: providerProfile?.bankAccountNumber || "",
+      bankIBAN: providerProfile?.bankIBAN || "",
     });
     setIsEditing(false);
   };
@@ -588,36 +595,32 @@ const ProviderProfilePage: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                  {/* District is typed by hand — the dropdown never covered
+                      every neighbourhood in the kingdom. */}
                   <div>
                     <Label htmlFor="profile-district">
                       {t("profile.district")}
                     </Label>
-                    <Select
+                    <Input
+                      id="profile-district"
                       value={formValues.district}
-                      onValueChange={(value) =>
+                      onChange={(e) =>
                         setFormValues((prev) => ({
                           ...prev,
-                          district: value,
+                          district: e.target.value,
                         }))
                       }
-                      disabled={!isEditing || !formValues.city}
-                    >
-                      <SelectTrigger id="profile-district" className="mt-1">
-                        <SelectValue
-                          placeholder={t("profile.districtPlaceholder")}
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {districtOptions.map((district) => (
-                          <SelectItem
-                            key={district.value}
-                            value={district.value}
-                          >
-                            {getLabel(district)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder={t("profile.districtPlaceholder")}
+                      disabled={!isEditing}
+                      className="mt-1"
+                      list="district-suggestions"
+                    />
+                    {/* Known districts for the chosen city, as suggestions only */}
+                    <datalist id="district-suggestions">
+                      {districtOptions.map((district) => (
+                        <option key={district.value} value={getLabel(district)} />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
 
@@ -720,6 +723,11 @@ const ProviderProfilePage: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+          </motion.div>
+
+          {/* Customer support contact */}
+          <motion.div variants={fadeInUp} className="mb-6">
+            <SupportContactCard />
           </motion.div>
 
           {/* Wallet Section */}

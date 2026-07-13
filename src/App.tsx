@@ -64,6 +64,7 @@ import AdminVerificationsPage from "@/pages/admin/AdminVerificationsPage";
 import AdminPayoutsPage from "@/pages/admin/AdminPayoutsPage";
 import AdminSubscriptionsPage from "@/pages/admin/AdminSubscriptionsPage";
 import AdminReportsPage from "@/pages/admin/AdminReportsPage";
+import AdminReviewsPage from "@/pages/admin/AdminReviewsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -201,6 +202,7 @@ const AppRoutes = () => {
         <Route path="payouts" element={<AdminPayoutsPage />} />
         <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
         <Route path="reports" element={<AdminReportsPage />} />
+        <Route path="reviews" element={<AdminReviewsPage />} />
       </Route>
 
       {/* Catch-all */}

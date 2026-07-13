@@ -43,6 +43,8 @@ import {
   formatDistance,
 } from "@/hooks/useGeolocation";
 import { Service } from "@/types";
+import { formatServiceDuration } from "@/lib/duration";
+import { formatLocation } from "@/lib/saudiLocations";
 import { ReportDialog } from "@/components/ReportDialog";
 import { ReviewDialog } from "@/components/ReviewDialog";
 import { toast } from "sonner";
@@ -246,9 +248,8 @@ const ProviderProfilePage: React.FC = () => {
                   <div className="mt-2 flex items-center gap-1 text-sm text-muted-foreground">
                     <MapPin className="h-4 w-4" />
                     <span>
-                      {[provider.area, provider.city]
-                        .filter(Boolean)
-                        .join(", ") || t("common.noResults")}
+                      {formatLocation(provider, isArabic) ||
+                        t("common.noResults")}
                     </span>
                   </div>
                 )}
@@ -327,7 +328,10 @@ const ProviderProfilePage: React.FC = () => {
                           <div className="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Clock className="h-4 w-4" />
-                              {service.durationMin} {t("search.min")}
+                              {formatServiceDuration(
+                                service,
+                                t("services.hourUnit"),
+                              )}
                             </span>
                           </div>
                         </div>
@@ -451,11 +455,7 @@ const ProviderProfilePage: React.FC = () => {
                   {(provider.city || provider.area) && (
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span>
-                        {[provider.area, provider.city]
-                          .filter(Boolean)
-                          .join(", ")}
-                      </span>
+                      <span>{formatLocation(provider, isArabic)}</span>
                     </div>
                   )}
                   {provider.radiusKm && (
@@ -466,6 +466,18 @@ const ProviderProfilePage: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Reporting must be findable, not buried in the ⋮ menu */}
+                {user && (
+                  <Button
+                    variant="outline"
+                    className="mt-6 w-full gap-2 border-destructive/40 text-destructive hover:bg-destructive/10"
+                    onClick={() => setReportDialogOpen(true)}
+                  >
+                    <Flag className="h-4 w-4" />
+                    {t("report.reportProvider")}
+                  </Button>
+                )}
               </div>
             </TabsContent>
           </Tabs>

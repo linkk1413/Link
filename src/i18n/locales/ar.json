@@ -474,6 +474,11 @@
     "emailVerificationRequiredTitle": "تأكيد البريد الإلكتروني",
     "emailVerificationRequiredDescription": "يرجى تأكيد بريدك الإلكتروني قبل إنشاء الخدمات. تحققي من صندوق الوارد للحصول على رابط التأكيد.",
     "resendVerificationEmail": "إعادة إرسال بريد التأكيد",
+    "subscriptionRequiredTitle": "الاشتراك مطلوب",
+    "subscriptionRequiredDescription": "اشتركي لتتمكني من إضافة أو تعديل خدماتك.",
+    "servicesHiddenDescription": "انتهى اشتراكك، لذلك تم إخفاء إعلاناتك عن العميلات ولا يمكنك إضافة إعلان جديد. سترجع إعلاناتك تلقائياً عند التجديد.",
+    "hiddenBySubscription": "مخفية — انتهى الاشتراك",
+    "hiddenBySubscriptionHint": "تم إخفاء هذه الخدمة تلقائياً عند انتهاء اشتراكك. جددي الاشتراك لإرجاعها.",
     "noServices": "لم تضيفي أي خدمات بعد",
     "addFirst": "أضيفي خدمتك الأولى",
     "inactive": "غير نشطة",
@@ -489,8 +494,10 @@
     "customCategory": "فئة مخصصة",
     "customCategoryPlaceholder": "اكتبي اسم الفئة",
     "price": "السعر (ريال)",
-    "duration": "المدة (بالدقائق)",
-    "durationHint": "كم تستغرق هذه الخدمة عادةً؟",
+    "duration": "المدة (بالساعة)",
+    "durationPlaceholder": "مثال: ساعتين",
+    "durationHint": "اكتبي المدة بالساعة، بالأرقام أو بالكلمات — مثل ١.٥ أو «ساعتين».",
+    "hourUnit": "ساعة",
     "locationType": "موقع الخدمة",
     "validationError": "يرجى تعبئة جميع الحقول المطلوبة بشكل صحيح.",
     "errors": {
@@ -499,7 +506,7 @@
       "categoryRequired": "يرجى اختيار فئة",
       "customCategoryRequired": "يرجى إدخال اسم الفئة المخصصة",
       "priceRequired": "السعر مطلوب (ريال واحد على الأقل)",
-      "durationRequired": "المدة مطلوبة (15 دقيقة على الأقل)"
+      "durationRequired": "المدة مطلوبة"
     },
     "deleteTitle": "حذف الخدمة؟",
     "deleteDescription": "لا يمكن التراجع عن هذا الإجراء. سيتم حذف الخدمة نهائياً.",
@@ -562,8 +569,11 @@
       "verifications": "التحققات",
       "payouts": "المدفوعات",
       "subscriptions": "الاشتراكات",
-      "reports": "البلاغات"
+      "reports": "البلاغات",
+      "reviews": "التقييمات"
     },
+    "copied": "تم نسخ {{field}}",
+    "noBankDetails": "لم تضف مقدمة الخدمة معلوماتها البنكية بعد — اطلبي منها إكمالها في ملفها الشخصي قبل التحويل.",
     "usersManagement": "إدارة المستخدمات",
     "usersDescription": "عرض وإدارة جميع المستخدمات في المنصة",
     "searchUsers": "البحث بالاسم أو البريد الإلكتروني...",
@@ -980,6 +990,34 @@
     "flagReview": "الإبلاغ عن التقييم",
     "reportProvider": "الإبلاغ عن مقدمة الخدمات",
     "reportUser": "الإبلاغ عن المستخدم"
+  },
+  "adminReviews": {
+    "title": "إدارة التقييمات",
+    "subtitle": "مراجعة وحذف تقييمات العميلات أو ردود مقدمات الخدمة",
+    "searchPlaceholder": "ابحثي باسم العميلة أو الخدمة أو نص التقييم",
+    "withReply": "فيها رد",
+    "lowRated": "تقييم منخفض (١–٢)",
+    "noReviews": "لا توجد تقييمات",
+    "anonymous": "عميلة",
+    "providerReply": "رد مقدمة الخدمة",
+    "deleteReview": "حذف التقييم",
+    "deleteReply": "حذف الرد",
+    "deleteReviewTitle": "حذف هذا التقييم؟",
+    "deleteReviewDescription": "سيتم حذف تقييم العميلة وتعليقها نهائياً، وسيُعاد احتساب تقييم مقدمة الخدمة.",
+    "deleteReplyTitle": "حذف رد مقدمة الخدمة؟",
+    "deleteReplyDescription": "سيتم حذف رد مقدمة الخدمة فقط، ويبقى تقييم العميلة وتعليقها كما هو.",
+    "reviewDeleted": "تم حذف التقييم",
+    "replyDeleted": "تم حذف الرد",
+    "noComment": "بدون تعليق"
+  },
+  "support": {
+    "title": "خدمة العملاء",
+    "email": "البريد الإلكتروني",
+    "phone": "الهاتف",
+    "whatsapp": "واتساب",
+    "whatsappAction": "تواصلي معنا",
+    "helpCenter": "مركز المساعدة",
+    "unavailable": "لم تتم إضافة معلومات التواصل بعد."
   },
   "block": {
     "block": "حظر",

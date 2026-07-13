@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProviderProfile } from "./queries/useProviders";
-import { checkAndExpireTrial, getUserDocument } from "@/lib/firestore";
+import {
+  checkAndExpireSubscription,
+  getUserDocument,
+  normalizeSubscriptionStatus,
+} from "@/lib/firestore";
 import { ProviderProfile } from "@/types";
 
 interface SubscriptionStatus {
@@ -9,6 +13,8 @@ interface SubscriptionStatus {
   isExpired: boolean;
   isTrial: boolean;
   isTrialExpired: boolean; // Trial specifically expired (not regular subscription)
+  /** May the provider publish services right now? */
+  canPublish: boolean;
   trialDaysRemaining: number;
   daysUntilExpiry: number;
   profile: ProviderProfile | null;
@@ -39,6 +45,7 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
     isExpired: false,
     isTrial: false,
     isTrialExpired: false,
+    canPublish: false,
     trialDaysRemaining: 0,
     daysUntilExpiry: -1,
     profile: null,
@@ -62,20 +69,21 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
     fetchUserDoc();
   }, [user?.uid]);
 
-  // Check and expire trial on-access
+  // Expire a lapsed subscription (trial or paid) on access. This is also what
+  // takes the provider's ads down when the subscription runs out.
   useEffect(() => {
-    const checkTrial = async () => {
-      if (profile?.subscriptionStatus === "TRIAL" && user?.uid) {
-        const wasExpired = await checkAndExpireTrial(user.uid);
-        if (wasExpired) {
-          // Mark that trial just expired
-          setTrialJustExpired(true);
+    const checkExpiry = async () => {
+      const current = normalizeSubscriptionStatus(profile?.subscriptionStatus);
+      if ((current === "TRIAL" || current === "ACTIVE") && user?.uid) {
+        const { expired, wasTrial } = await checkAndExpireSubscription(user.uid);
+        if (expired) {
+          if (wasTrial) setTrialJustExpired(true);
           // Refetch profile to get updated status
           refetch();
         }
       }
     };
-    checkTrial();
+    checkExpiry();
   }, [profile?.subscriptionStatus, user?.uid, refetch]);
 
   useEffect(() => {
@@ -85,6 +93,7 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
         isExpired: false,
         isTrial: false,
         isTrialExpired: false,
+        canPublish: false,
         trialDaysRemaining: 0,
         daysUntilExpiry: -1,
         profile: null,
@@ -94,7 +103,9 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
     }
 
     // Use subscription data from provider profile, or fallback to users collection
-    const subscriptionStatus = profile.subscriptionStatus || userSubscriptionData?.subscriptionStatus;
+    const subscriptionStatus = normalizeSubscriptionStatus(
+      profile.subscriptionStatus || userSubscriptionData?.subscriptionStatus,
+    );
     const subscriptionEndDate = profile.subscriptionEndDate || userSubscriptionData?.subscriptionEndDate;
     const accountStatus = profile.accountStatus || userSubscriptionData?.accountStatus;
 
@@ -141,11 +152,20 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
       }
     }
 
+    // Publishing requires a live subscription: not locked, not expired, and an
+    // end date still in the future (a lapsed end date beats a stale status).
+    const canPublish =
+      !isLocked &&
+      !isExpired &&
+      (isTrial || subscriptionStatus === "ACTIVE") &&
+      daysUntilExpiry >= 0;
+
     setStatus({
       isLocked,
       isExpired,
       isTrial,
       isTrialExpired,
+      canPublish,
       trialDaysRemaining,
       daysUntilExpiry,
       profile,

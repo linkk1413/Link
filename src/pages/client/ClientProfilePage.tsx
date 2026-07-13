@@ -37,6 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { SupportContactCard } from "@/components/SupportContactCard";
 import { useRequestTrackingConsent } from "@/components/TrackingConsent";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGuest } from "@/contexts/GuestContext";
@@ -382,40 +383,44 @@ const ClientProfilePage: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                  {/* District is typed by hand — the dropdown never covered
+                      every neighbourhood in the kingdom. */}
                   <div>
                     <Label htmlFor="client-district">
                       {t("profile.district")}
                     </Label>
-                    <Select
+                    <Input
+                      id="client-district"
                       value={formValues.district}
-                      onValueChange={(value) =>
+                      onChange={(e) =>
                         setFormValues((prev) => ({
                           ...prev,
-                          district: value,
+                          district: e.target.value,
                         }))
                       }
-                      disabled={!isEditing || !formValues.city}
-                    >
-                      <SelectTrigger id="client-district" className="mt-1">
-                        <SelectValue
-                          placeholder={t("profile.districtPlaceholder")}
+                      placeholder={t("profile.districtPlaceholder")}
+                      disabled={!isEditing}
+                      className="mt-1"
+                      list="client-district-suggestions"
+                    />
+                    {/* Known districts for the chosen city, as suggestions only */}
+                    <datalist id="client-district-suggestions">
+                      {districtOptions.map((district) => (
+                        <option
+                          key={district.value}
+                          value={getLabel(district)}
                         />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {districtOptions.map((district) => (
-                          <SelectItem
-                            key={district.value}
-                            value={district.value}
-                          >
-                            {getLabel(district)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      ))}
+                    </datalist>
                   </div>
                 </div>
               </CardContent>
             </Card>
+          </motion.div>
+
+          {/* Customer support contact */}
+          <motion.div variants={fadeInUp} className="mb-6">
+            <SupportContactCard />
           </motion.div>
 
           {/* Preferences */}

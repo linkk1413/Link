@@ -354,6 +354,99 @@ exports.onBookingStatusChanged = onDocumentUpdated(
 );
 
 // =====================
+// Subscriptions
+// =====================
+
+// Expire lapsed subscriptions and take the provider's ads down with them.
+// The client does this too when the provider opens the app, but a provider who
+// never logs in again must not keep live ads, so this runs server-side daily.
+// Services hidden here are flagged so a renewal can restore exactly these.
+exports.expireLapsedSubscriptions = onSchedule(
+  {
+    schedule: "every day 03:00",
+    timeZone: "Asia/Riyadh",
+    secrets: [resendApiKeyParam, emailFromParam],
+  },
+  async () => {
+    const now = admin.firestore.Timestamp.now();
+
+    // Only a range filter on one field, so no composite index is needed. The
+    // status is checked in code — it was written as "ACTIVE" by the admin flow
+    // but "active" by an older build of the checkout, so both must be swept.
+    const snapshot = await db
+      .collection("providers")
+      .where("subscriptionEndDate", "<=", now)
+      .get();
+
+    const lapsed = snapshot.docs.filter((providerDoc) => {
+      const status = String(
+        providerDoc.data().subscriptionStatus || "",
+      ).toUpperCase();
+      return status === "ACTIVE" || status === "TRIAL";
+    });
+
+    if (lapsed.length === 0) {
+      console.log("No lapsed subscriptions.");
+      return;
+    }
+
+    for (const providerDoc of lapsed) {
+      const providerId = providerDoc.id;
+      const wasTrial =
+        String(providerDoc.data().subscriptionStatus).toUpperCase() === "TRIAL";
+
+      try {
+        await providerDoc.ref.update({
+          subscriptionStatus: "EXPIRED",
+          isSubscribed: false,
+          wasOnTrial: wasTrial,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        const services = await db
+          .collection("services")
+          .where("providerId", "==", providerId)
+          .where("isActive", "==", true)
+          .get();
+
+        if (!services.empty) {
+          const batch = db.batch();
+          services.docs.forEach((serviceDoc) => {
+            batch.update(serviceDoc.ref, {
+              isActive: false,
+              deactivatedBySubscription: true,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          });
+          await batch.commit();
+        }
+
+        console.log(
+          `Expired ${providerId}: hid ${services.size} service(s), wasTrial=${wasTrial}`,
+        );
+
+        const providerUser = await getUserById(providerId);
+        if (providerUser?.email) {
+          await sendEmail({
+            to: providerUser.email,
+            subject: "Your subscription has ended",
+            text: "Your subscription has ended and your services are now hidden from clients. Renew to restore them.",
+            html: `
+              <p>Your subscription has ended.</p>
+              <p>Your services are now hidden from clients and you cannot add new ones.</p>
+              <p><strong>Renew your subscription and your services will be restored automatically.</strong></p>
+              <p><a href="https://www.link-22.com/provider/subscription">Renew now</a></p>
+            `,
+          });
+        }
+      } catch (error) {
+        console.error(`Failed to expire provider ${providerId}:`, error);
+      }
+    }
+  },
+);
+
+// =====================
 // PayPal Payment Functions
 // =====================
 

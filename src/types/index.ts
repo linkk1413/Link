@@ -138,9 +138,13 @@ export interface Service {
   title: string;
   description: string;
   price: number;
-  durationMin: number;
+  durationMin: number; // derived from durationText; used to compute booking endAt
+  durationText?: string; // what the provider typed, e.g. "ساعتين"
   locationType: LocationType;
   isActive: boolean;
+  // Set when the service was hidden automatically because the provider's
+  // subscription lapsed, so it can be restored on renewal.
+  deactivatedBySubscription?: boolean;
   mediaUrls: string[];
   createdAt: Date;
   updatedAt: Date;

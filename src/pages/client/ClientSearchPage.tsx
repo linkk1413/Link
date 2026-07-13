@@ -39,6 +39,8 @@ import {
   formatDistance,
 } from "@/hooks/useGeolocation";
 import { Service, ProviderProfile } from "@/types";
+import { formatServiceDuration } from "@/lib/duration";
+import { getCityLabel, getDistrictLabel } from "@/lib/saudiLocations";
 
 const ClientSearchPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -730,7 +732,10 @@ const ClientSearchPage: React.FC = () => {
                             {/* Duration */}
                             <Badge variant="outline" className="gap-1">
                               <Clock className="h-3 w-3" />
-                              {service.durationMin} {t("search.min")}
+                              {formatServiceDuration(
+                                service,
+                                t("services.hourUnit"),
+                              )}
                             </Badge>
 
                             {/* Distance / Location */}
@@ -745,7 +750,8 @@ const ClientSearchPage: React.FC = () => {
                             ) : provider?.area || provider?.city ? (
                               <Badge variant="outline" className="gap-1">
                                 <MapPin className="h-3 w-3" />
-                                {provider.area || provider.city}
+                                {getDistrictLabel(provider.area || "", isArabic) ||
+                                  getCityLabel(provider.city || "", isArabic)}
                               </Badge>
                             ) : null}
                           </div>

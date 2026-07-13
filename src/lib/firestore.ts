@@ -5,6 +5,7 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   collection,
   query,
   where,
@@ -960,6 +961,9 @@ export const verifySubscriptionPayment = async (
 
   // Use setDoc with merge to handle both existing and new documents
   await setDoc(providerRef, updateData, { merge: true });
+
+  // Bring back the ads that were auto-hidden when the subscription lapsed.
+  await reactivateProviderServices(providerId);
 };
 
 // Update subscription status manually (admin action)
@@ -988,40 +992,123 @@ export const updateSubscriptionStatus = async (
 
   if (status === "CANCELLED") {
     updates.cancellationDate = new Date();
+    updates.isSubscribed = false;
   }
 
   await updateDoc(providerRef, updates);
+
+  // Keep the provider's ads in step with the status the admin just set.
+  if (status === "ACTIVE" || status === "TRIAL") {
+    await reactivateProviderServices(providerId);
+  } else {
+    await deactivateProviderServices(providerId);
+  }
 };
 
-// Check and expire trial if it has ended
+// Subscription status is written as "ACTIVE" by the admin flow but as "active"
+// by an older version of the Moyasar checkout, so every comparison normalizes.
+export const normalizeSubscriptionStatus = (
+  status?: string | null,
+): "ACTIVE" | "TRIAL" | "EXPIRED" | "CANCELLED" | null =>
+  status
+    ? (status.toUpperCase() as "ACTIVE" | "TRIAL" | "EXPIRED" | "CANCELLED")
+    : null;
+
+/**
+ * Hide every service of a provider whose subscription lapsed. Flagged so a
+ * renewal can restore exactly these and not the ones the provider turned off
+ * herself.
+ */
+export const deactivateProviderServices = async (
+  providerId: string,
+): Promise<number> => {
+  const servicesRef = collection(db, COLLECTIONS.SERVICES);
+  const q = query(
+    servicesRef,
+    where("providerId", "==", providerId),
+    where("isActive", "==", true),
+  );
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return 0;
+
+  const batch = writeBatch(db);
+  snapshot.docs.forEach((serviceDoc) => {
+    batch.update(serviceDoc.ref, {
+      isActive: false,
+      deactivatedBySubscription: true,
+      updatedAt: serverTimestamp(),
+    });
+  });
+  await batch.commit();
+  return snapshot.size;
+};
+
+/** Restore the services that were auto-hidden when the subscription lapsed. */
+export const reactivateProviderServices = async (
+  providerId: string,
+): Promise<number> => {
+  const servicesRef = collection(db, COLLECTIONS.SERVICES);
+  const q = query(
+    servicesRef,
+    where("providerId", "==", providerId),
+    where("deactivatedBySubscription", "==", true),
+  );
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return 0;
+
+  const batch = writeBatch(db);
+  snapshot.docs.forEach((serviceDoc) => {
+    batch.update(serviceDoc.ref, {
+      isActive: true,
+      deactivatedBySubscription: false,
+      updatedAt: serverTimestamp(),
+    });
+  });
+  await batch.commit();
+  return snapshot.size;
+};
+
+/**
+ * Expire a lapsed subscription (trial or paid) on access and hide the provider's
+ * services. Idempotent: once the status is EXPIRED it does nothing.
+ */
+export const checkAndExpireSubscription = async (
+  providerId: string,
+): Promise<{ expired: boolean; wasTrial: boolean }> => {
+  const profile = await getProviderProfile(providerId);
+  if (!profile) return { expired: false, wasTrial: false };
+
+  const status = normalizeSubscriptionStatus(profile.subscriptionStatus);
+  if (status !== "TRIAL" && status !== "ACTIVE") {
+    return { expired: false, wasTrial: false };
+  }
+
+  if (!profile.subscriptionEndDate) return { expired: false, wasTrial: false };
+  if (new Date(profile.subscriptionEndDate) > new Date()) {
+    return { expired: false, wasTrial: false };
+  }
+
+  const wasTrial = status === "TRIAL";
+  const providerRef = doc(db, COLLECTIONS.PROVIDERS, providerId);
+  await updateDoc(providerRef, {
+    subscriptionStatus: "EXPIRED",
+    isSubscribed: false,
+    wasOnTrial: wasTrial,
+    updatedAt: serverTimestamp(),
+  });
+
+  // Take the ads down with the subscription.
+  await deactivateProviderServices(providerId);
+
+  return { expired: true, wasTrial };
+};
+
+// Kept for callers that only care about trials.
 export const checkAndExpireTrial = async (
   providerId: string,
 ): Promise<boolean> => {
-  const profile = await getProviderProfile(providerId);
-  if (!profile) return false;
-
-  // Only check TRIAL status providers
-  if (profile.subscriptionStatus !== "TRIAL") return false;
-
-  // Check if trial has expired
-  if (profile.subscriptionEndDate) {
-    const now = new Date();
-    const endDate = new Date(profile.subscriptionEndDate);
-
-    if (now > endDate) {
-      // Trial has expired, update status
-      const providerRef = doc(db, COLLECTIONS.PROVIDERS, providerId);
-      await updateDoc(providerRef, {
-        subscriptionStatus: "EXPIRED",
-        isSubscribed: false,
-        wasOnTrial: true, // Mark that this was a trial expiration
-        updatedAt: serverTimestamp(),
-      });
-      return true; // Trial was expired
-    }
-  }
-
-  return false; // Trial still active
+  const { expired, wasTrial } = await checkAndExpireSubscription(providerId);
+  return expired && wasTrial;
 };
 
 // Grant trial to an existing provider (admin action)
@@ -1599,6 +1686,9 @@ export const getReviewByBooking = async (
     id: doc.id,
     createdAt: timestampToDate(data.createdAt),
     updatedAt: data.updatedAt ? timestampToDate(data.updatedAt) : undefined,
+    providerReplyAt: data.providerReplyAt
+      ? timestampToDate(data.providerReplyAt)
+      : undefined,
   };
 };
 
@@ -1625,6 +1715,9 @@ export const getReviewByClientAndProvider = async (
     id: doc.id,
     createdAt: timestampToDate(data.createdAt),
     updatedAt: data.updatedAt ? timestampToDate(data.updatedAt) : undefined,
+    providerReplyAt: data.providerReplyAt
+      ? timestampToDate(data.providerReplyAt)
+      : undefined,
   };
 };
 
@@ -1643,6 +1736,9 @@ export const getReviewById = async (
     id: snapshot.id,
     createdAt: timestampToDate(data.createdAt),
     updatedAt: data.updatedAt ? timestampToDate(data.updatedAt) : undefined,
+    providerReplyAt: data.providerReplyAt
+      ? timestampToDate(data.providerReplyAt)
+      : undefined,
   };
 };
 
@@ -1768,6 +1864,48 @@ export const deleteReview = async (reviewId: string): Promise<void> => {
 
   // Update provider's rating after deletion
   await updateProviderRating(providerId);
+};
+
+/**
+ * Every review in the platform, newest first (admin moderation view).
+ * Sorted client-side to avoid a composite index.
+ */
+export const getAllReviews = async (): Promise<Review[]> => {
+  const reviewsRef = collection(db, COLLECTIONS.REVIEWS);
+  const snapshot = await getDocs(reviewsRef);
+
+  const reviews = snapshot.docs.map((reviewDoc) => {
+    const data = reviewDoc.data() as FirestoreReview;
+    return {
+      ...data,
+      id: reviewDoc.id,
+      createdAt: timestampToDate(data.createdAt),
+      updatedAt: data.updatedAt ? timestampToDate(data.updatedAt) : undefined,
+      providerReplyAt: data.providerReplyAt
+        ? timestampToDate(data.providerReplyAt)
+        : undefined,
+    };
+  });
+
+  return reviews.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+};
+
+/**
+ * Remove only the provider's reply, keeping the client's review and rating
+ * intact (admin moderation).
+ */
+export const deleteReviewReply = async (reviewId: string): Promise<void> => {
+  const reviewRef = doc(db, COLLECTIONS.REVIEWS, reviewId);
+  const reviewSnap = await getDoc(reviewRef);
+
+  if (!reviewSnap.exists()) {
+    throw new Error("Review not found");
+  }
+
+  await updateDoc(reviewRef, {
+    providerReply: deleteField(),
+    providerReplyAt: deleteField(),
+  });
 };
 
 // Add provider reply to a review (only one reply allowed)

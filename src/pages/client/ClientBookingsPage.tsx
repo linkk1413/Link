@@ -11,6 +11,7 @@ import { useClientBookings } from "@/hooks/queries/useBookings";
 import { useServices } from "@/hooks/queries/useServices";
 import { useVerifiedProviders } from "@/hooks/queries/useProviders";
 import { Booking, BookingStatus } from "@/types";
+import { formatLocation } from "@/lib/saudiLocations";
 
 // Group bookings into categories
 const categorizeBookings = (bookings: Booking[]) => {
@@ -159,7 +160,7 @@ const ClientBookingsPage: React.FC = () => {
 
             {/* Provider */}
             <p className="mt-1 text-sm text-muted-foreground">
-              {provider?.area}, {provider?.city}
+              {provider ? formatLocation(provider, isArabic) : ""}
             </p>
 
             {/* Date & Time */}

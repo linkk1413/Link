@@ -2,12 +2,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getReviews,
+  getAllReviews,
   getReviewByBooking,
   getReviewById,
   getReviewByClientAndProvider,
   createReview,
   updateReview,
   deleteReview,
+  deleteReviewReply,
   replyToReview,
 } from "@/lib/firestore";
 import { Review } from "@/types";
@@ -16,6 +18,7 @@ import { providerKeys } from "./useProviders";
 // Query keys for cache management
 export const reviewKeys = {
   all: ["reviews"] as const,
+  everything: ["reviews", "all"] as const,
   byProvider: (providerId: string) =>
     ["reviews", "provider", providerId] as const,
   byService: (serviceId: string) => ["reviews", "service", serviceId] as const,
@@ -35,6 +38,14 @@ export const useReviews = (filters?: {
     queryKey: providerId ? reviewKeys.byProvider(providerId) : reviewKeys.all,
     queryFn: () => getReviews(providerId || ""),
     enabled: !!providerId,
+  });
+};
+
+// Every review on the platform (admin moderation)
+export const useAllReviews = () => {
+  return useQuery<Review[], Error>({
+    queryKey: reviewKeys.everything,
+    queryFn: getAllReviews,
   });
 };
 
@@ -180,6 +191,8 @@ export const useDeleteReview = () => {
       queryClient.invalidateQueries({
         queryKey: reviewKeys.detail(variables.reviewId),
       });
+      // Invalidate the admin moderation list
+      queryClient.invalidateQueries({ queryKey: reviewKeys.everything });
       // Invalidate provider reviews list
       queryClient.invalidateQueries({
         queryKey: reviewKeys.byProvider(variables.providerId),
@@ -204,6 +217,27 @@ export const useDeleteReview = () => {
       queryClient.invalidateQueries({
         queryKey: providerKeys.all,
       });
+    },
+  });
+};
+
+// Remove the provider's reply, keeping the client's review (admin only)
+export const useDeleteReviewReply = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ reviewId }: { reviewId: string; providerId?: string }) =>
+      deleteReviewReply(reviewId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: reviewKeys.detail(variables.reviewId),
+      });
+      queryClient.invalidateQueries({ queryKey: reviewKeys.everything });
+      if (variables.providerId) {
+        queryClient.invalidateQueries({
+          queryKey: reviewKeys.byProvider(variables.providerId),
+        });
+      }
     },
   });
 };

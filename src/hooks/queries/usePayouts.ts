@@ -13,10 +13,17 @@ import {
 import { db } from "@/lib/firebase";
 import { Payout, PayoutStatus } from "@/types";
 
-// Extended payout with provider name for display
+// Extended payout with the provider's name and the bank details the admin needs
+// to actually make the transfer.
 export interface PayoutWithProvider extends Payout {
   providerName?: string;
+  providerEmail?: string;
+  providerPhone?: string;
   processedAt?: Date;
+  bankAccountHolder?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankIBAN?: string;
 }
 
 // Query keys
@@ -39,30 +46,39 @@ export const usePayouts = () => {
           snapshot.docs.map(async (payoutDoc) => {
             const data = payoutDoc.data();
 
-            // Fetch provider name from users collection first, then providers collection
+            // The name lives on the user doc; the bank details live on the
+            // provider doc — the admin needs both to process the transfer.
             let providerName = "Provider";
+            let providerEmail: string | undefined;
+            let providerPhone: string | undefined;
+            let bank: Record<string, string | undefined> = {};
+
             if (data.providerId) {
               try {
-                // First try users collection (has user.name)
-                const userRef = doc(db, "users", data.providerId);
-                const userDoc = await getDoc(userRef);
+                const [userDoc, providerDoc] = await Promise.all([
+                  getDoc(doc(db, "users", data.providerId)),
+                  getDoc(doc(db, "providers", data.providerId)),
+                ]);
+
                 if (userDoc.exists()) {
-                  providerName =
-                    userDoc.data().name ||
-                    userDoc.data().displayName ||
-                    "Provider";
+                  const u = userDoc.data();
+                  providerName = u.name || u.displayName || providerName;
+                  providerEmail = u.email;
+                  providerPhone = u.phone;
                 }
 
-                // If not found in users, try providers collection
-                if (providerName === "Provider") {
-                  const providerRef = doc(db, "providers", data.providerId);
-                  const providerDoc = await getDoc(providerRef);
-                  if (providerDoc.exists()) {
-                    providerName =
-                      providerDoc.data().name ||
-                      providerDoc.data().displayName ||
-                      "Provider";
+                if (providerDoc.exists()) {
+                  const p = providerDoc.data();
+                  if (providerName === "Provider") {
+                    providerName = p.name || p.displayName || "Provider";
                   }
+                  providerPhone = providerPhone || p.phone;
+                  bank = {
+                    bankAccountHolder: p.bankAccountHolder,
+                    bankName: p.bankName,
+                    bankAccountNumber: p.bankAccountNumber,
+                    bankIBAN: p.bankIBAN,
+                  };
                 }
               } catch (error) {
                 console.warn(
@@ -76,10 +92,13 @@ export const usePayouts = () => {
               id: payoutDoc.id,
               providerId: data.providerId || "",
               providerName,
+              providerEmail,
+              providerPhone,
               amount: data.amount || 0,
               status: data.status || "REQUESTED",
               createdAt: data.createdAt?.toDate() || new Date(),
               processedAt: data.processedAt?.toDate(),
+              ...bank,
             };
           }),
         );

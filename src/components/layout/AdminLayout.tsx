@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Gift,
   Flag,
+  Star,
   LogOut,
   Menu,
   X,
@@ -47,6 +48,11 @@ const adminNavItems = [
     path: "/admin/reports",
     labelKey: "admin.nav.reports",
     icon: <Flag className="h-5 w-5" />,
+  },
+  {
+    path: "/admin/reviews",
+    labelKey: "admin.nav.reviews",
+    icon: <Star className="h-5 w-5" />,
   },
 ];
 

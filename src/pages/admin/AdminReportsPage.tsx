@@ -28,7 +28,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useReports, useUpdateReportStatus } from "@/hooks/queries/useReports";
-import { useDeleteReview } from "@/hooks/queries/useReviews";
+import {
+  useDeleteReview,
+  useDeleteReviewReply,
+  useReviewById,
+} from "@/hooks/queries/useReviews";
 import { useAuth } from "@/contexts/AuthContext";
 import { Report, ReportStatus } from "@/types";
 import { toast } from "sonner";
@@ -49,6 +53,14 @@ const AdminReportsPage: React.FC = () => {
   );
   const updateStatus = useUpdateReportStatus();
   const deleteReview = useDeleteReview();
+  const deleteReply = useDeleteReviewReply();
+
+  // For a reported review we load the review itself: the report's targetOwnerId
+  // is whoever wrote the reported content (the client), not the provider whose
+  // rating has to be recalculated after a delete.
+  const reportedReviewId =
+    selectedReport?.targetType === "REVIEW" ? selectedReport.targetId : "";
+  const { data: reportedReview } = useReviewById(reportedReviewId);
 
   const filteredReports = useMemo(() => {
     if (!searchQuery.trim()) return reports;
@@ -91,6 +103,16 @@ const AdminReportsPage: React.FC = () => {
     }
   };
 
+  const resolveAfterModeration = async (note: string) => {
+    if (!selectedReport) return;
+    await updateStatus.mutateAsync({
+      reportId: selectedReport.id,
+      status: "RESOLVED" as ReportStatus,
+      adminNotes: (adminNotes.trim() ? adminNotes.trim() + "\n" : "") + note,
+      resolvedBy: user?.uid,
+    });
+  };
+
   const handleDeleteReviewContent = async () => {
     if (
       !selectedReport ||
@@ -101,22 +123,31 @@ const AdminReportsPage: React.FC = () => {
     try {
       await deleteReview.mutateAsync({
         reviewId: selectedReport.targetId,
-        providerId: selectedReport.targetOwnerId || "",
-        bookingId: "",
+        providerId: reportedReview?.providerId || "",
+        bookingId: reportedReview?.bookingId,
+        clientId: reportedReview?.clientId,
       });
-      // Auto-resolve the report after deleting the content
-      await updateStatus.mutateAsync({
-        reportId: selectedReport.id,
-        status: "RESOLVED" as ReportStatus,
-        adminNotes:
-          (adminNotes.trim() ? adminNotes.trim() + "\n" : "") +
-          "[Content deleted by admin]",
-        resolvedBy: user?.uid,
-      });
+      await resolveAfterModeration("[Review deleted by admin]");
       toast.success(t("adminReports.contentDeleted"));
       setDetailOpen(false);
     } catch (error) {
       console.error("Delete review error:", error);
+      toast.error(t("common.error"));
+    }
+  };
+
+  const handleDeleteReply = async () => {
+    if (!selectedReport?.targetId) return;
+    try {
+      await deleteReply.mutateAsync({
+        reviewId: selectedReport.targetId,
+        providerId: reportedReview?.providerId,
+      });
+      await resolveAfterModeration("[Provider reply deleted by admin]");
+      toast.success(t("adminReviews.replyDeleted"));
+      setDetailOpen(false);
+    } catch (error) {
+      console.error("Delete reply error:", error);
       toast.error(t("common.error"));
     }
   };
@@ -365,6 +396,18 @@ const AdminReportsPage: React.FC = () => {
                 </div>
               )}
 
+              {/* Provider's reply on the reported review */}
+              {reportedReview?.providerReply && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">
+                    {t("adminReviews.providerReply")}
+                  </Label>
+                  <div className="mt-1 rounded-lg border-s-2 border-primary bg-muted p-3">
+                    <p className="text-sm">{reportedReview.providerReply}</p>
+                  </div>
+                </div>
+              )}
+
               {/* Date */}
               <div>
                 <Label className="text-xs text-muted-foreground">
@@ -401,21 +444,41 @@ const AdminReportsPage: React.FC = () => {
                 <>
                   {/* Delete content (for review reports) */}
                   {selectedReport.targetType === "REVIEW" && (
-                    <Button
-                      variant="destructive"
-                      onClick={handleDeleteReviewContent}
-                      disabled={
-                        deleteReview.isPending || updateStatus.isPending
-                      }
-                      className="w-full sm:w-auto"
-                    >
-                      {deleteReview.isPending ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4 mr-2" />
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                      <Button
+                        variant="destructive"
+                        onClick={handleDeleteReviewContent}
+                        disabled={
+                          deleteReview.isPending || updateStatus.isPending
+                        }
+                      >
+                        {deleteReview.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 mr-2" />
+                        )}
+                        {t("adminReports.deleteContent")}
+                      </Button>
+
+                      {/* Remove just the provider's reply, keeping the rating */}
+                      {reportedReview?.providerReply && (
+                        <Button
+                          variant="outline"
+                          onClick={handleDeleteReply}
+                          disabled={
+                            deleteReply.isPending || updateStatus.isPending
+                          }
+                          className="text-destructive"
+                        >
+                          {deleteReply.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4 mr-2" />
+                          )}
+                          {t("adminReviews.deleteReply")}
+                        </Button>
                       )}
-                      {t("adminReports.deleteContent")}
-                    </Button>
+                    </div>
                   )}
 
                   <div className="flex gap-2 w-full sm:w-auto sm:ms-auto">

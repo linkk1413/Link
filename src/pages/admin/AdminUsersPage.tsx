@@ -45,6 +45,11 @@ import {
 } from "@/hooks/queries/usePayments";
 import { useProviderProfile } from "@/hooks/queries/useProviders";
 import { User as UserType, UserRole, UserStatus } from "@/types";
+import {
+  getCityLabel,
+  getDistrictLabel,
+  getRegionLabel,
+} from "@/lib/saudiLocations";
 
 const AdminUsersPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -507,9 +512,10 @@ const AdminUsersPage: React.FC = () => {
                     {t("profile.region")}
                   </p>
                   <p className="text-sm font-medium">
-                    {providerProfile?.region ||
-                      detailsUser?.region ||
-                      t("admin.notProvided")}
+                    {getRegionLabel(
+                      providerProfile?.region || detailsUser?.region || "",
+                      isArabic,
+                    ) || t("admin.notProvided")}
                   </p>
                 </div>
                 <div>
@@ -517,9 +523,10 @@ const AdminUsersPage: React.FC = () => {
                     {t("profile.city")}
                   </p>
                   <p className="text-sm font-medium">
-                    {providerProfile?.city ||
-                      detailsUser?.city ||
-                      t("admin.notProvided")}
+                    {getCityLabel(
+                      providerProfile?.city || detailsUser?.city || "",
+                      isArabic,
+                    ) || t("admin.notProvided")}
                   </p>
                 </div>
                 <div>
@@ -527,9 +534,10 @@ const AdminUsersPage: React.FC = () => {
                     {t("profile.district")}
                   </p>
                   <p className="text-sm font-medium">
-                    {providerProfile?.area ||
-                      detailsUser?.district ||
-                      t("admin.notProvided")}
+                    {getDistrictLabel(
+                      providerProfile?.area || detailsUser?.district || "",
+                      isArabic,
+                    ) || t("admin.notProvided")}
                   </p>
                 </div>
               </div>

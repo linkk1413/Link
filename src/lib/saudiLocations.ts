@@ -1208,3 +1208,58 @@ export const SAUDI_REGIONS: Region[] = [
     ],
   },
 ];
+
+// Regions and cities are stored by their English `value` ("Riyadh"), so anything
+// that renders a stored value must translate it back through these helpers —
+// otherwise Arabic users see English place names.
+
+const pickLabel = (
+  item: { label: { en: string; ar: string } } | undefined,
+  isArabic: boolean,
+  fallback: string,
+): string => {
+  if (!item) return fallback;
+  return (isArabic ? item.label.ar : item.label.en) || fallback;
+};
+
+export const getRegionLabel = (value: string, isArabic: boolean): string => {
+  if (!value) return "";
+  return pickLabel(
+    SAUDI_REGIONS.find((region) => region.value === value),
+    isArabic,
+    value,
+  );
+};
+
+export const getCityLabel = (value: string, isArabic: boolean): string => {
+  if (!value) return "";
+  for (const region of SAUDI_REGIONS) {
+    const city = region.cities.find((c) => c.value === value);
+    if (city) return pickLabel(city, isArabic, value);
+  }
+  return value;
+};
+
+/**
+ * Districts are free text now, so an unknown value is returned as typed — only
+ * the legacy values picked from the old dropdown get translated.
+ */
+export const getDistrictLabel = (value: string, isArabic: boolean): string => {
+  if (!value) return "";
+  for (const region of SAUDI_REGIONS) {
+    for (const city of region.cities) {
+      const district = city.districts.find((d) => d.value === value);
+      if (district) return pickLabel(district, isArabic, value);
+    }
+  }
+  return value;
+};
+
+/** "الروضة، الرياض" — skips empty parts. */
+export const formatLocation = (
+  parts: { city?: string; area?: string },
+  isArabic: boolean,
+): string =>
+  [getDistrictLabel(parts.area || "", isArabic), getCityLabel(parts.city || "", isArabic)]
+    .filter(Boolean)
+    .join(isArabic ? "، " : ", ");

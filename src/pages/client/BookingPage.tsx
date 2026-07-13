@@ -18,6 +18,7 @@ import { useProviderProfile } from "@/hooks/queries/useProviders";
 import { useCreateBooking } from "@/hooks/queries/useBookings";
 import { useCreatePayment } from "@/hooks/queries/usePayments";
 import { useAuth } from "@/contexts/AuthContext";
+import { formatServiceDuration } from "@/lib/duration";
 import MoyasarCheckout from "@/components/payments/MoyasarCheckout";
 import {
   finalizeMoyasarBooking,
@@ -352,9 +353,7 @@ const BookingPage: React.FC = () => {
             <div className="mt-3 flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
-                <span>
-                  {service.durationMin} {t("search.min")}
-                </span>
+                <span>{formatServiceDuration(service, t("services.hourUnit"))}</span>
               </div>
               <p className="font-semibold text-primary">{service.price} SAR</p>
             </div>

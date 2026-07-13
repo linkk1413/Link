@@ -14,6 +14,7 @@ import {
   X,
   Loader2,
   Shield,
+  Lock,
 } from "lucide-react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
@@ -67,13 +68,14 @@ import { useProviderProfile } from "@/hooks/queries/useProviders";
 import { toast } from "@/components/ui/sonner";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Service, LocationType } from "@/types";
+import { parseDurationToMinutes, formatServiceDuration } from "@/lib/duration";
 import { z } from "zod";
 
 const ProviderServicesPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { user, firebaseUser } = useAuth();
   const navigate = useNavigate();
-  const { isLocked } = useSubscriptionStatus();
+  const { isLocked, canPublish } = useSubscriptionStatus();
   const isArabic = i18n.language === "ar";
   const [isSendingVerification, setIsSendingVerification] =
     React.useState(false);
@@ -86,14 +88,15 @@ const ProviderServicesPage: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Form state
+  // Form state. `duration` is free text ("ساعتين", "1.5") — it is parsed into
+  // minutes on save because bookings need a numeric length.
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     categoryId: "",
     customCategory: "",
     price: "",
-    durationMin: "",
+    duration: "",
     locationType: "AT_PROVIDER" as LocationType,
     mediaUrls: [] as string[],
   });
@@ -129,7 +132,7 @@ const ProviderServicesPage: React.FC = () => {
       categoryId: "",
       customCategory: "",
       price: "",
-      durationMin: "",
+      duration: "",
       locationType: "AT_PROVIDER",
       mediaUrls: [],
     });
@@ -142,6 +145,14 @@ const ProviderServicesPage: React.FC = () => {
       toast.error(t("provider.accountLockedTitle"), {
         description: t("provider.accountLockedMessage"),
       });
+      return;
+    }
+    // No live subscription → no new ads.
+    if (!canPublish) {
+      toast.error(t("services.subscriptionRequiredTitle"), {
+        description: t("services.subscriptionRequiredDescription"),
+      });
+      navigate("/provider/subscription");
       return;
     }
     if (!isProfileComplete) {
@@ -175,6 +186,13 @@ const ProviderServicesPage: React.FC = () => {
   };
 
   const openEditForm = (service: Service) => {
+    if (!canPublish) {
+      toast.error(t("services.subscriptionRequiredTitle"), {
+        description: t("services.subscriptionRequiredDescription"),
+      });
+      navigate("/provider/subscription");
+      return;
+    }
     const matchedCategory = categories.find((c) => c.id === service.categoryId);
     const isCustomCategory = !matchedCategory && !!service.categoryId;
     setEditingService(service);
@@ -186,7 +204,8 @@ const ProviderServicesPage: React.FC = () => {
         ? service.categoryName || service.categoryId
         : "",
       price: service.price.toString(),
-      durationMin: service.durationMin.toString(),
+      // Show what the provider originally typed; fall back to the stored minutes.
+      duration: formatServiceDuration(service, t("services.hourUnit")),
       locationType: service.locationType,
       mediaUrls: service.mediaUrls || [],
     });
@@ -290,9 +309,12 @@ const ProviderServicesPage: React.FC = () => {
       errors.price = t("services.errors.priceRequired");
     }
 
-    const parsedDuration = parseInt(formData.durationMin);
-    if (!formData.durationMin || isNaN(parsedDuration) || parsedDuration < 15) {
-      errors.durationMin = t("services.errors.durationRequired");
+    // Duration is free text; only its presence is required. It is converted to
+    // minutes so the booking flow can still compute an end time.
+    const durationText = formData.duration.trim();
+    const parsedDuration = parseDurationToMinutes(durationText);
+    if (!durationText) {
+      errors.duration = t("services.errors.durationRequired");
     }
 
     // If there are errors, show them and stop
@@ -369,9 +391,11 @@ const ProviderServicesPage: React.FC = () => {
       categoryName: resolvedCategoryName || undefined,
       price: validation.data.price,
       durationMin: validation.data.durationMin,
+      durationText,
       locationType: validation.data.locationType,
       providerId: user.uid,
       isActive: true,
+      deactivatedBySubscription: false,
       mediaUrls: formData.mediaUrls,
     };
 
@@ -404,10 +428,22 @@ const ProviderServicesPage: React.FC = () => {
   };
 
   const handleToggleActive = async (service: Service) => {
+    // Re-publishing requires a live subscription; turning an ad off is always allowed.
+    if (!service.isActive && !canPublish) {
+      toast.error(t("services.subscriptionRequiredTitle"), {
+        description: t("services.subscriptionRequiredDescription"),
+      });
+      return;
+    }
     try {
       await updateServiceMutation.mutateAsync({
         id: service.id,
-        updates: { isActive: !service.isActive },
+        updates: {
+          isActive: !service.isActive,
+          // A manual toggle clears the auto-hidden flag: from now on this is the
+          // provider's own choice, and a renewal must not override it.
+          deactivatedBySubscription: false,
+        },
       });
     } catch (error) {
       console.error("Failed to toggle service:", error);
@@ -445,7 +481,12 @@ const ProviderServicesPage: React.FC = () => {
             onClick={openAddForm}
             size="sm"
             className="gap-2"
-            disabled={!isProfileComplete || isLocked || needsEmailVerification}
+            disabled={
+              !isProfileComplete ||
+              isLocked ||
+              !canPublish ||
+              needsEmailVerification
+            }
           >
             <Plus className="h-4 w-4" />
             {t("services.addService")}
@@ -454,6 +495,34 @@ const ProviderServicesPage: React.FC = () => {
       </header>
 
       <main className="container py-4">
+        {/* Subscription required — ads are hidden and no new ones can be added */}
+        {!canPublish && !isLocked && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-950/30"
+          >
+            <div className="flex items-start gap-3">
+              <Lock className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" />
+              <div className="flex-1">
+                <h3 className="font-medium text-red-800 dark:text-red-200">
+                  {t("services.subscriptionRequiredTitle")}
+                </h3>
+                <p className="mt-1 text-sm text-red-700 dark:text-red-300">
+                  {t("services.servicesHiddenDescription")}
+                </p>
+                <Button
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => navigate("/provider/subscription")}
+                >
+                  {t("provider.subscribeNow")}
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Email Verification Banner */}
         {needsEmailVerification && (
           <motion.div
@@ -508,7 +577,7 @@ const ProviderServicesPage: React.FC = () => {
             <Button
               onClick={openAddForm}
               className="mt-4 gap-2"
-              disabled={!isProfileComplete || isLocked}
+              disabled={!isProfileComplete || isLocked || !canPublish}
             >
               <Plus className="h-4 w-4" />
               {t("services.addFirst")}
@@ -537,11 +606,21 @@ const ProviderServicesPage: React.FC = () => {
                         <h3 className="font-semibold text-foreground">
                           {service.title}
                         </h3>
-                        {!service.isActive && (
-                          <Badge variant="secondary">
-                            {t("services.inactive")}
-                          </Badge>
-                        )}
+                        {!service.isActive &&
+                          (service.deactivatedBySubscription ? (
+                            <Badge
+                              variant="destructive"
+                              className="gap-1"
+                              title={t("services.hiddenBySubscriptionHint")}
+                            >
+                              <Lock className="h-3 w-3" />
+                              {t("services.hiddenBySubscription")}
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">
+                              {t("services.inactive")}
+                            </Badge>
+                          ))}
                       </div>
 
                       <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
@@ -564,7 +643,7 @@ const ProviderServicesPage: React.FC = () => {
                         </span>
                         <span className="flex items-center gap-1">
                           <Clock className="h-4 w-4" />
-                          {service.durationMin} {t("search.min")}
+                          {formatServiceDuration(service, t("services.hourUnit"))}
                         </span>
                         <span className="flex items-center gap-1">
                           <MapPin className="h-4 w-4" />
@@ -843,7 +922,7 @@ const ProviderServicesPage: React.FC = () => {
               )}
             </div>
 
-            {/* Duration */}
+            {/* Duration — free text, in hours */}
             <div>
               <Label htmlFor="duration">
                 {t("services.duration")}{" "}
@@ -851,19 +930,19 @@ const ProviderServicesPage: React.FC = () => {
               </Label>
               <Input
                 id="duration"
-                type="number"
-                value={formData.durationMin}
+                type="text"
+                value={formData.duration}
                 onChange={(e) => {
-                  setFormData({ ...formData, durationMin: e.target.value });
-                  if (formErrors.durationMin)
-                    setFormErrors({ ...formErrors, durationMin: "" });
+                  setFormData({ ...formData, duration: e.target.value });
+                  if (formErrors.duration)
+                    setFormErrors({ ...formErrors, duration: "" });
                 }}
-                placeholder="60"
-                className={`mt-1 ${formErrors.durationMin ? "border-destructive" : ""}`}
+                placeholder={t("services.durationPlaceholder")}
+                className={`mt-1 ${formErrors.duration ? "border-destructive" : ""}`}
               />
-              {formErrors.durationMin && (
+              {formErrors.duration && (
                 <p className="mt-1 text-xs text-destructive">
-                  {formErrors.durationMin}
+                  {formErrors.duration}
                 </p>
               )}
               <p className="mt-1 text-xs text-muted-foreground">
@@ -908,6 +987,7 @@ const ProviderServicesPage: React.FC = () => {
                 (formData.categoryId === "__custom__" &&
                   !formData.customCategory.trim()) ||
                 !formData.price ||
+                !formData.duration.trim() ||
                 createServiceMutation.isPending ||
                 updateServiceMutation.isPending
               }

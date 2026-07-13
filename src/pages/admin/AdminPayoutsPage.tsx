@@ -8,7 +8,13 @@ import {
   Clock,
   DollarSign,
   Search,
+  Landmark,
+  Copy,
+  AlertTriangle,
+  Mail,
+  Phone,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -111,9 +117,95 @@ const AdminPayoutsPage: React.FC = () => {
     return `${amount.toFixed(2)} SAR`;
   };
 
+  const copyToClipboard = async (value: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(t("admin.copied", { field: label }));
+    } catch {
+      toast.error(t("common.error"));
+    }
+  };
+
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 },
+  };
+
+  /**
+   * The bank details the admin needs to actually send the money. Providers fill
+   * these in on their profile; if they are missing the payout can't be paid, so
+   * we say so instead of showing an empty box.
+   */
+  const renderBankDetails = (payout: PayoutWithProvider) => {
+    const fields = [
+      {
+        key: "accountHolder",
+        label: t("profile.accountHolder"),
+        value: payout.bankAccountHolder,
+      },
+      { key: "bankName", label: t("profile.bankName"), value: payout.bankName },
+      {
+        key: "accountNumber",
+        label: t("profile.accountNumber"),
+        value: payout.bankAccountNumber,
+      },
+      { key: "iban", label: t("profile.iban"), value: payout.bankIBAN },
+    ].filter((field) => !!field.value?.trim());
+
+    if (fields.length === 0) {
+      return (
+        <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <p className="text-sm">{t("admin.noBankDetails")}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3">
+        <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
+          <Landmark className="h-4 w-4 text-primary" />
+          {t("profile.bankAccount")}
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {fields.map((field) => (
+            <div key={field.key} className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">{field.label}</p>
+                <p dir="ltr" className="truncate text-sm font-medium text-foreground">
+                  {field.value}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0"
+                onClick={() => copyToClipboard(field.value!, field.label)}
+              >
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+
+        {(payout.providerEmail || payout.providerPhone) && (
+          <div className="mt-3 flex flex-wrap gap-4 border-t border-border pt-2 text-xs text-muted-foreground">
+            {payout.providerEmail && (
+              <span className="flex items-center gap-1">
+                <Mail className="h-3.5 w-3.5" />
+                <span dir="ltr">{payout.providerEmail}</span>
+              </span>
+            )}
+            {payout.providerPhone && (
+              <span className="flex items-center gap-1">
+                <Phone className="h-3.5 w-3.5" />
+                <span dir="ltr">{payout.providerPhone}</span>
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const renderPayoutList = (
@@ -142,10 +234,8 @@ const AdminPayoutsPage: React.FC = () => {
     return (
       <div className="space-y-3">
         {payoutList.map((payout) => (
-          <div
-            key={payout.id}
-            className="flex items-center justify-between rounded-xl bg-card p-4"
-          >
+          <div key={payout.id} className="rounded-xl bg-card p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-center gap-4">
               <Avatar className="h-12 w-12">
                 <AvatarImage src="" />
@@ -212,6 +302,10 @@ const AdminPayoutsPage: React.FC = () => {
                 <Badge variant="destructive">{t("wallet.rejected")}</Badge>
               )}
             </div>
+            </div>
+
+            {/* Bank details — hidden for rejected payouts, which are never paid */}
+            {payout.status !== "REJECTED" && renderBankDetails(payout)}
           </div>
         ))}
       </div>

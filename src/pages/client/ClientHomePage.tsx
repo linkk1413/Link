@@ -28,6 +28,8 @@ import { useCategories } from "@/hooks/queries/useCategories";
 import { useServices } from "@/hooks/queries/useServices";
 import { useVerifiedProviders } from "@/hooks/queries/useProviders";
 import { useBanner } from "@/hooks/queries/useBanner";
+import { formatServiceDuration } from "@/lib/duration";
+import { formatLocation } from "@/lib/saudiLocations";
 import {
   useGeolocation,
   calculateDistanceKm,
@@ -394,7 +396,7 @@ const ClientHomePage: React.FC = () => {
                       <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />
                         <span>
-                          {service.durationMin} {t("search.min")}
+                          {formatServiceDuration(service, t("services.hourUnit"))}
                         </span>
                       </div>
                       <div className="mt-2 flex items-center justify-between">
@@ -482,7 +484,7 @@ const ClientHomePage: React.FC = () => {
                           <div className="flex items-center gap-1">
                             <MapPin className="h-4 w-4" />
                             <span className="truncate">
-                              {provider.city}, {provider.area}
+                              {formatLocation(provider, isArabic)}
                             </span>
                           </div>
                           {distance !== null && (
