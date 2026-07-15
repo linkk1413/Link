@@ -1887,6 +1887,30 @@ export const getAllReviews = async (): Promise<Review[]> => {
     };
   });
 
+  // Fill in each reviewer's current registered name. Older reviews saved no
+  // clientName (or only an email prefix), so the moderation view fell back to a
+  // generic "client" label; look the real name up by clientId instead.
+  const clientIds = [
+    ...new Set(reviews.map((r) => r.clientId).filter(Boolean)),
+  ];
+  const nameById = new Map<string, string>();
+  await Promise.all(
+    clientIds.map(async (uid) => {
+      try {
+        const userDoc = await getUserDocument(uid);
+        if (userDoc?.name) nameById.set(uid, userDoc.name);
+      } catch {
+        // Ignore lookup failures; keep whatever name was stored on the review.
+      }
+    }),
+  );
+  for (const review of reviews) {
+    const realName = review.clientId
+      ? nameById.get(review.clientId)
+      : undefined;
+    if (realName) review.clientName = realName;
+  }
+
   return reviews.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 };
 
