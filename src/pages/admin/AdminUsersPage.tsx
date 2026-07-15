@@ -641,20 +641,17 @@ const AdminUsersPage: React.FC = () => {
                     <p className="text-xs text-muted-foreground">
                       {t("profile.accountNumber")}
                     </p>
-                    <p className="text-sm font-medium">
-                      {providerProfile.bankAccountNumber
-                        ? `****${providerProfile.bankAccountNumber.slice(-4)}`
-                        : t("admin.notProvided")}
+                    <p className="text-sm font-medium break-all">
+                      {providerProfile.bankAccountNumber ||
+                        t("admin.notProvided")}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">
                       {t("profile.iban")}
                     </p>
-                    <p className="text-sm font-medium">
-                      {providerProfile.bankIBAN
-                        ? `${providerProfile.bankIBAN.slice(0, 4)}****${providerProfile.bankIBAN.slice(-4)}`
-                        : t("admin.notProvided")}
+                    <p className="text-sm font-medium break-all">
+                      {providerProfile.bankIBAN || t("admin.notProvided")}
                     </p>
                   </div>
                 </div>

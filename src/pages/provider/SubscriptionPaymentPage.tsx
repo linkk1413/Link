@@ -17,8 +17,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscriptionSettings } from "@/hooks/queries/useSubscriptionSettings";
+import { providerKeys } from "@/hooks/queries/useProviders";
 import MoyasarCheckout from "@/components/payments/MoyasarCheckout";
 import {
   finalizeMoyasarSubscription,
@@ -37,6 +39,7 @@ const SubscriptionPaymentPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const isArabic = i18n.language === "ar";
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<"card" | "bank_transfer">("card");
@@ -175,6 +178,10 @@ const SubscriptionPaymentPage: React.FC = () => {
         draft,
       });
       sessionStorage.removeItem(MOYASAR_SUB_DRAFT_KEY);
+      // Drop the stale (expired) provider profile so the dashboard reflects the
+      // now-active subscription instead of keeping the expiry banner.
+      queryClient.invalidateQueries({ queryKey: providerKeys.detail(draft.uid) });
+      queryClient.invalidateQueries({ queryKey: providerKeys.all });
       setPaymentSuccess(true);
       toast.success(
         t("subscription.paymentSuccess") ||

@@ -4,9 +4,11 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useQueryClient } from "@tanstack/react-query";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { providerKeys } from "@/hooks/queries/useProviders";
 import {
   finalizeMoyasarSubscription,
   MOYASAR_SUB_DRAFT_KEY,
@@ -18,6 +20,14 @@ const SubscriptionCallbackPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Drop the cached (still-expired) provider profile so the dashboard refetches
+  // and the "subscription expired" banner clears right after renewal.
+  const refreshSubscriptionCache = (uid: string) => {
+    queryClient.invalidateQueries({ queryKey: providerKeys.detail(uid) });
+    queryClient.invalidateQueries({ queryKey: providerKeys.all });
+  };
   const [status, setStatus] = useState<"loading" | "success" | "failed">(
     "loading",
   );
@@ -53,6 +63,7 @@ const SubscriptionCallbackPage: React.FC = () => {
           const draft = JSON.parse(draftRaw) as MoyasarSubscriptionDraft;
           await finalizeMoyasarSubscription({ apiBaseUrl, paymentId, draft });
           sessionStorage.removeItem(MOYASAR_SUB_DRAFT_KEY);
+          refreshSubscriptionCache(draft.uid);
           setStatus("success");
           setMessage(
             t("subscription.subscriptionActivated") ||
@@ -65,6 +76,7 @@ const SubscriptionCallbackPage: React.FC = () => {
         if (user) {
           const snap = await getDoc(doc(db, "providers", user.uid));
           if (snap.exists() && snap.data()?.lastPaymentOrderId === paymentId) {
+            refreshSubscriptionCache(user.uid);
             setStatus("success");
             setMessage(
               t("subscription.subscriptionActivated") ||
