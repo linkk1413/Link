@@ -7,7 +7,7 @@
 // payment server-side and de-dupes by the Moyasar payment id (stored in the
 // provider doc's lastPaymentOrderId), so a subscription is activated once.
 
-import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { reactivateProviderServices } from "@/lib/firestore";
 
@@ -109,10 +109,14 @@ export async function finalizeMoyasarSubscription(params: {
     wasOnTrial: false,
   };
 
-  // 4. Activate on both docs (banner reads from providers).
+  // 4. Activate on both docs (banner reads from providers). Use setDoc+merge,
+  //    not updateDoc: a provider subscribing for the first time may not have a
+  //    providers/{uid} doc yet, and updateDoc throws on a missing document —
+  //    which would fail the whole activation even though the payment went
+  //    through. merge creates it when absent and patches it when present.
   await Promise.all([
-    updateDoc(userRef, subscriptionData),
-    updateDoc(providerRef, subscriptionData),
+    setDoc(userRef, subscriptionData, { merge: true }),
+    setDoc(providerRef, subscriptionData, { merge: true }),
   ]);
 
   // 5. Restore the ads that were auto-hidden when the subscription lapsed.

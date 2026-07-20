@@ -43,8 +43,12 @@ const SubscriptionCallbackPage: React.FC = () => {
       if (finalizedRef.current) return;
       finalizedRef.current = true;
 
+      // Lenient pre-filter; finalizeMoyasarSubscription re-verifies the real
+      // status server-side. Accept "authorized" too so 3DS cards that report it
+      // in the redirect are not rejected before that server check runs.
       const succeeded =
-        paymentStatus && ["paid", "captured"].includes(paymentStatus);
+        paymentStatus &&
+        ["authorized", "paid", "captured"].includes(paymentStatus);
 
       if (!paymentId || !succeeded) {
         setStatus("failed");
