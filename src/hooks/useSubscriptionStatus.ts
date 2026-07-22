@@ -111,22 +111,13 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
 
     const isLocked = accountStatus === "LOCKED";
     const isTrial = subscriptionStatus === "TRIAL";
-    // Treat undefined or missing status as expired
-    const isExpired =
-      !subscriptionStatus ||
-      subscriptionStatus === "EXPIRED" ||
-      subscriptionStatus === "CANCELLED";
 
-    // Check if trial just expired (either just detected or profile shows it was a trial)
-    // We check wasOnTrial from profile if available, or use local state
-    const isTrialExpired = trialJustExpired || (isExpired && profile.wasOnTrial === true);
-
+    // Parse the end date FIRST — it is the source of truth for whether a paid
+    // period is still active. A fresh renewal sets a future date.
+    const now = new Date();
     let daysUntilExpiry = -1;
-    let trialDaysRemaining = 0;
+    let endDate: Date | null = null;
     if (subscriptionEndDate) {
-      const today = new Date();
-      // Handle Firestore Timestamp or regular Date
-      let endDate: Date;
       const rawDate = subscriptionEndDate as { toDate?: () => Date } | Date | string;
       if (
         rawDate &&
@@ -141,24 +132,32 @@ export const useSubscriptionStatus = (): SubscriptionStatus => {
       } else {
         endDate = new Date(rawDate as string);
       }
-
       daysUntilExpiry = Math.ceil(
-        (endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+        (endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
       );
+    }
+    const hasFutureEnd = !!endDate && endDate.getTime() > now.getTime();
 
-      // If in trial, calculate trial days remaining
-      if (isTrial) {
-        trialDaysRemaining = Math.max(0, daysUntilExpiry);
-      }
+    // Expired only when the status says so AND no active paid period remains.
+    // A future end date (just renewed) always wins over a stale status string —
+    // this is what clears the banner immediately after renewal.
+    const statusExpired =
+      !subscriptionStatus ||
+      subscriptionStatus === "EXPIRED" ||
+      subscriptionStatus === "CANCELLED";
+    const isExpired = statusExpired && !hasFutureEnd;
+
+    // Check if trial just expired
+    const isTrialExpired =
+      trialJustExpired || (isExpired && profile.wasOnTrial === true);
+
+    let trialDaysRemaining = 0;
+    if (isTrial && daysUntilExpiry > 0) {
+      trialDaysRemaining = daysUntilExpiry;
     }
 
-    // Publishing requires a live subscription: not locked, not expired, and an
-    // end date still in the future (a lapsed end date beats a stale status).
-    const canPublish =
-      !isLocked &&
-      !isExpired &&
-      (isTrial || subscriptionStatus === "ACTIVE") &&
-      daysUntilExpiry >= 0;
+    // Publishing requires a live period: not locked, not expired, still time left.
+    const canPublish = !isLocked && !isExpired && daysUntilExpiry >= 0;
 
     setStatus({
       isLocked,
