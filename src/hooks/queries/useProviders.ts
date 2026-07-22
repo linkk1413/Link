@@ -41,6 +41,9 @@ export const useProviderProfile = (uid: string) => {
     queryKey: providerKeys.detail(uid),
     queryFn: () => getProviderProfile(uid),
     enabled: !!uid,
+    // Always refetch on mount so the subscription banner reflects a fresh
+    // renewal instead of a cached (still-expired) profile.
+    refetchOnMount: "always",
   });
 };
 
