@@ -2,7 +2,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getReviews,
-  getAllReviews,
+  getProviderReviewsForAdmin,
+  getReviewsByClient,
+  setReviewHidden,
   getReviewByBooking,
   getReviewById,
   getReviewByClientAndProvider,
@@ -18,9 +20,12 @@ import { providerKeys } from "./useProviders";
 // Query keys for cache management
 export const reviewKeys = {
   all: ["reviews"] as const,
-  everything: ["reviews", "all"] as const,
   byProvider: (providerId: string) =>
     ["reviews", "provider", providerId] as const,
+  byProviderAdmin: (providerId: string) =>
+    ["reviews", "provider-admin", providerId] as const,
+  byClientAdmin: (clientId: string) =>
+    ["reviews", "client-admin", clientId] as const,
   byService: (serviceId: string) => ["reviews", "service", serviceId] as const,
   byBooking: (bookingId: string) => ["reviews", "booking", bookingId] as const,
   byClientProvider: (clientId: string, providerId: string) =>
@@ -41,11 +46,60 @@ export const useReviews = (filters?: {
   });
 };
 
-// Every review on the platform (admin moderation)
-export const useAllReviews = () => {
+// Every review for a provider, including admin-hidden ones — used by the
+// subscriber detail page's Reviews tab so a hidden review can be restored.
+export const useAdminProviderReviews = (providerId: string) => {
   return useQuery<Review[], Error>({
-    queryKey: reviewKeys.everything,
-    queryFn: getAllReviews,
+    queryKey: reviewKeys.byProviderAdmin(providerId),
+    queryFn: () => getProviderReviewsForAdmin(providerId),
+    enabled: !!providerId,
+  });
+};
+
+// Every review a client wrote, across all providers — used on a client
+// subscriber's detail page.
+export const useClientReviews = (clientId: string) => {
+  return useQuery<Review[], Error>({
+    queryKey: reviewKeys.byClientAdmin(clientId),
+    queryFn: () => getReviewsByClient(clientId),
+    enabled: !!clientId,
+  });
+};
+
+// Admin: hide/restore a review without deleting it.
+export const useSetReviewHidden = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      reviewId,
+      hidden,
+    }: {
+      reviewId: string;
+      hidden: boolean;
+      providerId: string;
+      clientId?: string;
+    }) => setReviewHidden(reviewId, hidden),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: reviewKeys.detail(variables.reviewId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: reviewKeys.byProvider(variables.providerId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: reviewKeys.byProviderAdmin(variables.providerId),
+      });
+      if (variables.clientId) {
+        queryClient.invalidateQueries({
+          queryKey: reviewKeys.byClientAdmin(variables.clientId),
+        });
+      }
+      queryClient.invalidateQueries({
+        queryKey: providerKeys.detail(variables.providerId),
+      });
+      queryClient.invalidateQueries({ queryKey: providerKeys.all });
+    },
   });
 };
 
@@ -192,7 +246,14 @@ export const useDeleteReview = () => {
         queryKey: reviewKeys.detail(variables.reviewId),
       });
       // Invalidate the admin moderation list
-      queryClient.invalidateQueries({ queryKey: reviewKeys.everything });
+      queryClient.invalidateQueries({
+        queryKey: reviewKeys.byProviderAdmin(variables.providerId),
+      });
+      if (variables.clientId) {
+        queryClient.invalidateQueries({
+          queryKey: reviewKeys.byClientAdmin(variables.clientId),
+        });
+      }
       // Invalidate provider reviews list
       queryClient.invalidateQueries({
         queryKey: reviewKeys.byProvider(variables.providerId),
@@ -232,10 +293,12 @@ export const useDeleteReviewReply = () => {
       queryClient.invalidateQueries({
         queryKey: reviewKeys.detail(variables.reviewId),
       });
-      queryClient.invalidateQueries({ queryKey: reviewKeys.everything });
       if (variables.providerId) {
         queryClient.invalidateQueries({
           queryKey: reviewKeys.byProvider(variables.providerId),
+        });
+        queryClient.invalidateQueries({
+          queryKey: reviewKeys.byProviderAdmin(variables.providerId),
         });
       }
     },

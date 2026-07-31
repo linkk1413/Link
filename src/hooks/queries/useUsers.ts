@@ -125,7 +125,9 @@ export const useUser = (userId: string) => {
             email,
             name,
             displayName,
+            roles: data.roles || [],
             role: data.role || null,
+            activeRole: data.activeRole || null,
             status: data.status || "ACTIVE",
             phone: data.phone || "",
             region: data.region || "",
@@ -133,6 +135,7 @@ export const useUser = (userId: string) => {
             district: data.district || "",
             notificationsEnabled: data.notificationsEnabled ?? true,
             createdAt: data.createdAt?.toDate() || new Date(),
+            lastLoginAt: data.lastLoginAt?.toDate() || undefined,
           } as User;
         }
       } catch (error) {
@@ -161,8 +164,9 @@ export const useUpdateUserStatus = () => {
       const userRef = doc(db, "users", userId);
       await updateDoc(userRef, { status });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: userKeys.all });
+      queryClient.invalidateQueries({ queryKey: userKeys.detail(variables.userId) });
     },
   });
 };
@@ -184,8 +188,9 @@ export const useUpdateUserRole = () => {
       const userRef = doc(db, "users", userId);
       await updateDoc(userRef, { role, activeRole: role, roles: [role] });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: userKeys.all });
+      queryClient.invalidateQueries({ queryKey: userKeys.detail(variables.userId) });
     },
   });
 };
@@ -206,8 +211,9 @@ export const useAdminUpdateUserProfile = () => {
       const userRef = doc(db, "users", userId);
       await updateDoc(userRef, updates);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: userKeys.all });
+      queryClient.invalidateQueries({ queryKey: userKeys.detail(variables.userId) });
     },
   });
 };

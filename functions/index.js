@@ -372,7 +372,10 @@ exports.onReviewWritten = onDocumentWritten(
       .where("providerId", "==", providerId)
       .get();
 
+    // Admin-hidden reviews don't count toward the rating, same as they're
+    // excluded from public/provider display (see getReviews in firestore.ts).
     const ratings = snapshot.docs
+      .filter((doc) => !doc.data().hidden)
       .map((doc) => Number(doc.data().rating))
       .filter((r) => Number.isFinite(r));
 

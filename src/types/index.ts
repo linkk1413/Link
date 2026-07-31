@@ -283,6 +283,9 @@ export interface Review {
   providerReplyAt?: Date; // When the provider replied
   createdAt: Date;
   updatedAt?: Date;
+  // Soft-hide by an admin — excluded from public display and from the
+  // provider's ratingAvg/ratingCount, but kept for potential restore.
+  hidden?: boolean;
 }
 
 // Report

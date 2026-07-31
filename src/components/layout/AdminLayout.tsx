@@ -8,12 +8,10 @@ import {
   LayoutDashboard,
   Gift,
   Flag,
-  Star,
   LogOut,
   Menu,
   X,
   Settings,
-  MessageSquare,
   ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,11 +24,6 @@ const adminNavItems = [
     path: "/admin",
     labelKey: "admin.nav.dashboard",
     icon: <LayoutDashboard className="h-5 w-5" />,
-  },
-  {
-    path: "/admin/chats",
-    labelKey: "admin.nav.chats",
-    icon: <MessageSquare className="h-5 w-5" />,
   },
   {
     path: "/admin/orders",
@@ -61,11 +54,6 @@ const adminNavItems = [
     path: "/admin/reports",
     labelKey: "admin.nav.reports",
     icon: <Flag className="h-5 w-5" />,
-  },
-  {
-    path: "/admin/reviews",
-    labelKey: "admin.nav.reviews",
-    icon: <Star className="h-5 w-5" />,
   },
   {
     path: "/admin/settings",

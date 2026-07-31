@@ -60,13 +60,12 @@ import ProviderReviewsPage from "@/pages/provider/ProviderReviewsPage";
 // Admin pages
 import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
 import AdminUsersPage from "@/pages/admin/AdminUsersPage";
+import AdminUserDetailPage from "@/pages/admin/AdminUserDetailPage";
 import AdminVerificationsPage from "@/pages/admin/AdminVerificationsPage";
 import AdminPayoutsPage from "@/pages/admin/AdminPayoutsPage";
 import AdminSubscriptionsPage from "@/pages/admin/AdminSubscriptionsPage";
 import AdminReportsPage from "@/pages/admin/AdminReportsPage";
-import AdminReviewsPage from "@/pages/admin/AdminReviewsPage";
 import AdminSettingsPage from "@/pages/admin/AdminSettingsPage";
-import AdminChatsPage from "@/pages/admin/AdminChatsPage";
 import AdminOrdersPage from "@/pages/admin/AdminOrdersPage";
 
 const queryClient = new QueryClient({
@@ -201,13 +200,12 @@ const AppRoutes = () => {
       >
         <Route index element={<AdminDashboardPage />} />
         <Route path="users" element={<AdminUsersPage />} />
+        <Route path="users/:uid" element={<AdminUserDetailPage />} />
         <Route path="verifications" element={<AdminVerificationsPage />} />
         <Route path="payouts" element={<AdminPayoutsPage />} />
         <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
         <Route path="reports" element={<AdminReportsPage />} />
-        <Route path="reviews" element={<AdminReviewsPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
-        <Route path="chats" element={<AdminChatsPage />} />
         <Route path="orders" element={<AdminOrdersPage />} />
       </Route>
 

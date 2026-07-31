@@ -1655,6 +1655,18 @@ export interface FirestoreReview extends Omit<
 }
 
 export const getReviews = async (providerId: string): Promise<Review[]> => {
+  // Public/provider-facing — a review an admin hid is invisible here, same
+  // as it's excluded from ratingAvg/ratingCount (see onReviewWritten). Admin
+  // moderation uses getProviderReviewsForAdmin instead, which keeps hidden
+  // ones so they can be restored.
+  const reviews = await getProviderReviewsForAdmin(providerId);
+  return reviews.filter((review) => !review.hidden);
+};
+
+/** Every review for a provider, including admin-hidden ones (admin only). */
+export const getProviderReviewsForAdmin = async (
+  providerId: string,
+): Promise<Review[]> => {
   const reviewsRef = collection(db, COLLECTIONS.REVIEWS);
   // Simple query - sorting will be done client-side to avoid composite index requirement
   const q = query(reviewsRef, where("providerId", "==", providerId));
@@ -1673,6 +1685,37 @@ export const getReviews = async (providerId: string): Promise<Review[]> => {
 
   // Sort by createdAt descending (client-side)
   return reviews.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+};
+
+/** Every review written by a client, across all providers (admin only). */
+export const getReviewsByClient = async (
+  clientId: string,
+): Promise<Review[]> => {
+  const reviewsRef = collection(db, COLLECTIONS.REVIEWS);
+  const q = query(reviewsRef, where("clientId", "==", clientId));
+  const snapshot = await getDocs(q);
+
+  const reviews = snapshot.docs.map((doc) => {
+    const data = doc.data() as FirestoreReview;
+    return {
+      ...data,
+      id: doc.id,
+      createdAt: timestampToDate(data.createdAt),
+      updatedAt: data.updatedAt ? timestampToDate(data.updatedAt) : undefined,
+      providerReplyAt: data.providerReplyAt ? timestampToDate(data.providerReplyAt) : undefined,
+    };
+  });
+
+  return reviews.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+};
+
+/** Admin-only: hide or restore a review without deleting it. */
+export const setReviewHidden = async (
+  reviewId: string,
+  hidden: boolean,
+): Promise<void> => {
+  const reviewRef = doc(db, COLLECTIONS.REVIEWS, reviewId);
+  await updateDoc(reviewRef, { hidden, updatedAt: serverTimestamp() });
 };
 
 // Get a review by booking ID (to check if review exists)
@@ -1823,54 +1866,6 @@ export const deleteReview = async (reviewId: string): Promise<void> => {
   await deleteDoc(reviewRef);
 
   // Provider rating is recomputed by the onReviewWritten Cloud Function.
-};
-
-/**
- * Every review in the platform, newest first (admin moderation view).
- * Sorted client-side to avoid a composite index.
- */
-export const getAllReviews = async (): Promise<Review[]> => {
-  const reviewsRef = collection(db, COLLECTIONS.REVIEWS);
-  const snapshot = await getDocs(reviewsRef);
-
-  const reviews = snapshot.docs.map((reviewDoc) => {
-    const data = reviewDoc.data() as FirestoreReview;
-    return {
-      ...data,
-      id: reviewDoc.id,
-      createdAt: timestampToDate(data.createdAt),
-      updatedAt: data.updatedAt ? timestampToDate(data.updatedAt) : undefined,
-      providerReplyAt: data.providerReplyAt
-        ? timestampToDate(data.providerReplyAt)
-        : undefined,
-    };
-  });
-
-  // Fill in each reviewer's current registered name. Older reviews saved no
-  // clientName (or only an email prefix), so the moderation view fell back to a
-  // generic "client" label; look the real name up by clientId instead.
-  const clientIds = [
-    ...new Set(reviews.map((r) => r.clientId).filter(Boolean)),
-  ];
-  const nameById = new Map<string, string>();
-  await Promise.all(
-    clientIds.map(async (uid) => {
-      try {
-        const userDoc = await getUserDocument(uid);
-        if (userDoc?.name) nameById.set(uid, userDoc.name);
-      } catch {
-        // Ignore lookup failures; keep whatever name was stored on the review.
-      }
-    }),
-  );
-  for (const review of reviews) {
-    const realName = review.clientId
-      ? nameById.get(review.clientId)
-      : undefined;
-    if (realName) review.clientName = realName;
-  }
-
-  return reviews.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 };
 
 /**
