@@ -497,6 +497,254 @@ exports.expireLapsedSubscriptions = onSchedule(
   },
 );
 
+// Verifies a Moyasar subscription payment directly with Moyasar (secret key,
+// server-side) and activates the provider's subscription via the Admin SDK.
+// The browser used to write subscriptionStatus/accountStatus/isSubscribed
+// directly to its own providers/{uid} doc after a client-side verification
+// call — firestore.rules now blocks that self-write (same class of issue as
+// the payments.status fix), so this callable is the only path left that can
+// set those fields for a non-admin caller. Idempotent: de-dupes on the
+// Moyasar payment id stored in lastPaymentOrderId.
+exports.activateSubscription = onCall(
+  { secrets: [moyasarSecretKeyParam] },
+  async (request) => {
+    const callerUid = request.auth?.uid;
+    if (!callerUid) {
+      throw new HttpsError("unauthenticated", "Sign in required.");
+    }
+
+    const { paymentId, planId, planName, planMonths, price } =
+      request.data || {};
+
+    const monthsNum = Number(planMonths);
+    const priceNum = Number(price);
+    if (
+      !paymentId ||
+      typeof paymentId !== "string" ||
+      !Number.isFinite(monthsNum) ||
+      monthsNum <= 0 ||
+      !Number.isFinite(priceNum) ||
+      priceNum <= 0
+    ) {
+      throw new HttpsError("invalid-argument", "Missing or invalid subscription data.");
+    }
+
+    const providerRef = db.collection("providers").doc(callerUid);
+    const userRef = db.collection("users").doc(callerUid);
+
+    const providerSnap = await providerRef.get();
+    const providerData = providerSnap.exists ? providerSnap.data() : {};
+
+    // De-dupe: this exact payment already activated the subscription.
+    if (providerData.lastPaymentOrderId === paymentId) {
+      const existingEnd =
+        providerData.subscriptionEndDate?.toDate?.() ?? new Date();
+      return { deduped: true, endDate: existingEnd.toISOString() };
+    }
+
+    // Verify the payment with Moyasar directly. Never trust the caller.
+    const secretKey = moyasarSecretKeyParam.value();
+    if (!secretKey) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Payment verification not configured.",
+      );
+    }
+    const authHeader = `Basic ${Buffer.from(`${secretKey}:`).toString("base64")}`;
+    const response = await fetch(
+      `https://api.moyasar.com/v1/payments/${paymentId}`,
+      { headers: { Authorization: authHeader } },
+    );
+    const payment = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new HttpsError(
+        "failed-precondition",
+        payment.message || "Could not verify payment.",
+      );
+    }
+
+    const okStatus = ["paid", "captured"].includes(payment.status);
+    if (!okStatus) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Payment not completed (status: ${payment.status}).`,
+      );
+    }
+
+    const expectedHalalas = Math.round(priceNum * 100);
+    if (payment.amount !== expectedHalalas || payment.currency !== "SAR") {
+      throw new HttpsError(
+        "failed-precondition",
+        "Payment amount does not match the selected plan.",
+      );
+    }
+
+    // Extend from the later of now / current end so early renewals add time
+    // instead of resetting it.
+    const nowDate = new Date();
+    const currentEnd = providerData.subscriptionEndDate?.toDate?.() ?? null;
+    const base = currentEnd && currentEnd > nowDate ? currentEnd : nowDate;
+    const endDate = new Date(base);
+    endDate.setMonth(endDate.getMonth() + monthsNum);
+
+    const subscriptionData = {
+      subscriptionStatus: "ACTIVE",
+      subscriptionStartDate: admin.firestore.Timestamp.fromDate(nowDate),
+      subscriptionEndDate: admin.firestore.Timestamp.fromDate(endDate),
+      subscriptionPlanId: planId || null,
+      subscriptionPlanMonths: monthsNum,
+      lastPaymentDate: admin.firestore.Timestamp.fromDate(nowDate),
+      lastPaymentAmount: priceNum,
+      lastPaymentGateway: "MOYASAR",
+      lastPaymentOrderId: paymentId,
+      lastPaymentAuthorizationId: paymentId,
+      accountStatus: "ACTIVE",
+      isSubscribed: true,
+      wasOnTrial: false,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const writeBatch = db.batch();
+    writeBatch.set(providerRef, subscriptionData, { merge: true });
+    writeBatch.set(userRef, subscriptionData, { merge: true });
+    await writeBatch.commit();
+
+    // Restore the ads that were auto-hidden when the subscription lapsed.
+    const lapsedServices = await db
+      .collection("services")
+      .where("providerId", "==", callerUid)
+      .where("deactivatedBySubscription", "==", true)
+      .get();
+    if (!lapsedServices.empty) {
+      const restoreBatch = db.batch();
+      lapsedServices.docs.forEach((serviceDoc) => {
+        restoreBatch.update(serviceDoc.ref, {
+          isActive: true,
+          deactivatedBySubscription: false,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+      await restoreBatch.commit();
+    }
+
+    console.log(`Activated subscription for provider ${callerUid}, planName=${planName || "n/a"}`);
+
+    return { deduped: false, endDate: endDate.toISOString() };
+  },
+);
+
+// Lazily expires the caller's own lapsed trial/subscription (mirrors the
+// nightly expireLapsedSubscriptions sweep, but runs on-access so a provider
+// sees the correct state immediately instead of waiting for the next 03:00
+// run). Writing subscriptionStatus/isSubscribed used to happen client-side
+// via updateDoc — moved server-side alongside activateSubscription so the
+// providers/users self-write block in firestore.rules doesn't also break
+// this legitimate "expire myself" path.
+exports.expireMySubscription = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) {
+    throw new HttpsError("unauthenticated", "Sign in required.");
+  }
+
+  const providerRef = db.collection("providers").doc(callerUid);
+  const providerSnap = await providerRef.get();
+  if (!providerSnap.exists) {
+    return { expired: false, wasTrial: false };
+  }
+  const profile = providerSnap.data();
+
+  const status = String(profile.subscriptionStatus || "").toUpperCase();
+  if (status !== "TRIAL" && status !== "ACTIVE") {
+    return { expired: false, wasTrial: false };
+  }
+
+  const endDate = profile.subscriptionEndDate?.toDate?.();
+  if (!endDate || endDate > new Date()) {
+    return { expired: false, wasTrial: false };
+  }
+
+  const wasTrial = status === "TRIAL";
+  await providerRef.update({
+    subscriptionStatus: "EXPIRED",
+    isSubscribed: false,
+    wasOnTrial: wasTrial,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  const services = await db
+    .collection("services")
+    .where("providerId", "==", callerUid)
+    .where("isActive", "==", true)
+    .get();
+  if (!services.empty) {
+    const batch = db.batch();
+    services.docs.forEach((serviceDoc) => {
+      batch.update(serviceDoc.ref, {
+        isActive: false,
+        deactivatedBySubscription: true,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+    await batch.commit();
+  }
+
+  return { expired: true, wasTrial };
+});
+
+// Grants the free trial (if configured) on a freshly created provider doc.
+// createProviderProfile (client) creates the base providers/{uid} doc with no
+// subscription fields — firestore.rules blocks a self-create from including
+// them, so a signup can't hand itself an active subscription by racing the
+// write. This callable does that one-time trial grant server-side instead.
+// A no-op if the provider already has a subscriptionStatus (never re-grants).
+exports.grantSignupTrial = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) {
+    throw new HttpsError("unauthenticated", "Sign in required.");
+  }
+
+  const providerRef = db.collection("providers").doc(callerUid);
+  const providerSnap = await providerRef.get();
+  if (!providerSnap.exists) {
+    throw new HttpsError("failed-precondition", "Provider profile not found.");
+  }
+  if (providerSnap.data().subscriptionStatus) {
+    return { granted: false };
+  }
+
+  const settingsSnap = await db.collection("settings").doc("subscription").get();
+  const settings = settingsSnap.exists ? settingsSnap.data() : {};
+  const trialDays = Number(settings.trialDays) || 0;
+  const monthlyPrice = Number(settings.monthlyPrice) || 10;
+
+  const now = new Date();
+  let subscriptionStatus = "EXPIRED";
+  let subscriptionStartDate = null;
+  let subscriptionEndDate = null;
+  if (trialDays > 0) {
+    subscriptionStatus = "TRIAL";
+    subscriptionStartDate = admin.firestore.Timestamp.fromDate(now);
+    const end = new Date(now);
+    end.setDate(end.getDate() + trialDays);
+    subscriptionEndDate = admin.firestore.Timestamp.fromDate(end);
+  }
+
+  await providerRef.update({
+    isSubscribed: trialDays > 0,
+    subscriptionStatus,
+    subscriptionStartDate,
+    subscriptionEndDate,
+    subscriptionPrice: monthlyPrice,
+    autoRenew: false,
+    cancellationDate: null,
+    accountStatus: "ACTIVE",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { granted: true, subscriptionStatus };
+});
+
 // =====================
 // PayPal Payment Functions
 // =====================

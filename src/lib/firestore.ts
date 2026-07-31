@@ -19,7 +19,8 @@ import {
   QueryDocumentSnapshot,
   DocumentData,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "./firebase";
 import {
   User,
   UserRole,
@@ -731,12 +732,27 @@ export const getProviderProfile = async (
           accountStatus: "ACTIVE",
         };
 
-        // Try to save to Firestore (may fail if current user isn't the provider)
+        // Try to save to Firestore (may fail if current user isn't the
+        // provider). The doc create itself can't include subscription fields
+        // (firestore.rules blocks that on self-create), so persist the base
+        // profile only, then let grantSignupTrial (Admin SDK) set the real
+        // subscription defaults/trial — same as a normal signup.
         try {
           await setDoc(providerRef, {
-            ...newProfile,
+            uid,
+            displayName: userName,
+            bio: "",
+            region: "",
+            city: "",
+            area: "",
+            isVerified: false,
+            identityVerified: false,
+            ratingAvg: 0,
+            ratingCount: 0,
             updatedAt: serverTimestamp(),
           });
+          const grantTrial = httpsCallable(functions, "grantSignupTrial");
+          await grantTrial({});
         } catch (saveError) {
           // Permission issue - return in-memory profile
         }
@@ -862,22 +878,11 @@ export const createProviderProfile = async (
 ): Promise<void> => {
   const providerRef = doc(db, COLLECTIONS.PROVIDERS, uid);
 
-  // Fetch subscription settings to determine trial period
-  const subscriptionSettings = await getSubscriptionSettings();
-  const trialDays = subscriptionSettings.trialDays || 0;
-
-  // Calculate trial end date if trial is enabled
-  let subscriptionStatus: "TRIAL" | "EXPIRED" = "EXPIRED";
-  let subscriptionEndDate: Date | null = null;
-  let subscriptionStartDate: Date | null = null;
-
-  if (trialDays > 0) {
-    subscriptionStatus = "TRIAL";
-    subscriptionStartDate = new Date();
-    subscriptionEndDate = new Date();
-    subscriptionEndDate.setDate(subscriptionEndDate.getDate() + trialDays);
-  }
-
+  // The initial document create can only contain non-privileged fields —
+  // firestore.rules blocks a self-create that includes subscription/account
+  // fields, so a signing-up provider can't hand themselves an active
+  // subscription by racing this write. The free trial (if any) is granted
+  // right after via the grantSignupTrial Cloud Function (Admin SDK).
   await setDoc(providerRef, {
     uid,
     ...profile,
@@ -885,17 +890,15 @@ export const createProviderProfile = async (
     identityVerified: false, // Account verification - required to add services
     ratingAvg: 0,
     ratingCount: 0,
-    // Subscription initialization with trial support
-    isSubscribed: trialDays > 0, // Subscribed during trial
-    subscriptionStatus,
-    subscriptionStartDate,
-    subscriptionEndDate,
-    subscriptionPrice: subscriptionSettings.monthlyPrice || 10, // SAR per month
-    autoRenew: false,
-    cancellationDate: null,
-    accountStatus: "ACTIVE",
     updatedAt: serverTimestamp(),
   });
+
+  try {
+    const grantTrial = httpsCallable(functions, "grantSignupTrial");
+    await grantTrial({});
+  } catch (err) {
+    console.warn("Failed to grant signup trial:", err);
+  }
 };
 
 export const updateProviderProfile = async (
@@ -1141,32 +1144,15 @@ export const reactivateProviderServices = async (
 export const checkAndExpireSubscription = async (
   providerId: string,
 ): Promise<{ expired: boolean; wasTrial: boolean }> => {
-  const profile = await getProviderProfile(providerId);
-  if (!profile) return { expired: false, wasTrial: false };
-
-  const status = normalizeSubscriptionStatus(profile.subscriptionStatus);
-  if (status !== "TRIAL" && status !== "ACTIVE") {
-    return { expired: false, wasTrial: false };
-  }
-
-  if (!profile.subscriptionEndDate) return { expired: false, wasTrial: false };
-  if (new Date(profile.subscriptionEndDate) > new Date()) {
-    return { expired: false, wasTrial: false };
-  }
-
-  const wasTrial = status === "TRIAL";
-  const providerRef = doc(db, COLLECTIONS.PROVIDERS, providerId);
-  await updateDoc(providerRef, {
-    subscriptionStatus: "EXPIRED",
-    isSubscribed: false,
-    wasOnTrial: wasTrial,
-    updatedAt: serverTimestamp(),
-  });
-
-  // Take the ads down with the subscription.
-  await deactivateProviderServices(providerId);
-
-  return { expired: true, wasTrial };
+  // Delegates to the expireMySubscription Cloud Function (Admin SDK write) —
+  // firestore.rules blocks a provider from writing subscriptionStatus to
+  // their own doc directly, same as it blocks self-activating one.
+  const expireMine = httpsCallable<
+    Record<string, never>,
+    { expired: boolean; wasTrial: boolean }
+  >(functions, "expireMySubscription");
+  const result = await expireMine({});
+  return result.data;
 };
 
 // Kept for callers that only care about trials.

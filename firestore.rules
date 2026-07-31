@@ -49,6 +49,35 @@ service cloud.firestore {
         && d.get('role', '') != 'ADMIN';
     }
 
+    // Subscription/account fields are written only by the activateSubscription
+    // Cloud Function or the admin panel (Admin SDK) — never by the account
+    // owner directly, or a provider could grant themselves a paid
+    // subscription, or undo an admin's account lock, by self-writing.
+    function subscriptionFields() {
+      return [
+        'subscriptionStatus', 'accountStatus', 'isSubscribed',
+        'subscriptionStartDate', 'subscriptionEndDate',
+        'subscriptionPlanId', 'subscriptionPlanMonths',
+        'lastPaymentDate', 'lastPaymentAmount', 'lastPaymentGateway',
+        'lastPaymentOrderId', 'lastPaymentAuthorizationId', 'wasOnTrial',
+        'lastSubscriptionPaymentDate', 'lastSubscriptionPaymentAmount',
+        'lastSubscriptionPaymentMethod', 'paymentVerificationStatus',
+        'paymentNotes', 'cancellationDate', 'subscriptionPrice'
+      ];
+    }
+
+    function noSubscriptionSelfWrite() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(subscriptionFields());
+    }
+
+    // On create there is no resource.data to diff against, so check presence
+    // directly — a brand-new providers/{uid} doc must start with no
+    // subscription state at all. The free trial (if any) is granted right
+    // after by the grantSignupTrial Cloud Function.
+    function noSubscriptionFieldsPresent() {
+      return !request.resource.data.keys().hasAny(subscriptionFields());
+    }
+
     match /users/{userId} {
       // Allow get for own document or admin
       allow get: if signedIn() && (userId == request.auth.uid || isAdmin());
@@ -56,25 +85,28 @@ service cloud.firestore {
       // else is capped to limit(1) — enough for the phone-uniqueness check,
       // not enough to dump the collection.
       allow list: if isAdmin() || (signedIn() && request.query.limit <= 1);
-      allow create: if signedIn() && userId == request.auth.uid && noSelfAdminEscalation();
+      allow create: if signedIn() && userId == request.auth.uid && noSelfAdminEscalation() && noSubscriptionFieldsPresent();
       allow update: if isAdmin() || (
-        signedIn() && userId == request.auth.uid && noSelfAdminEscalation()
+        signedIn() && userId == request.auth.uid && noSelfAdminEscalation() && noSubscriptionSelfWrite()
       );
       allow delete: if isAdmin();
     }
 
     match /providers/{providerId} {
       allow read: if true;
-      allow create: if signedIn() && (providerId == request.auth.uid || isAdmin());
+      allow create: if isAdmin() || (
+        signedIn() && providerId == request.auth.uid && noSubscriptionFieldsPresent()
+      );
       // Owner/admin may update their profile, but ratingAvg/ratingCount and
       // the isVerified/verifiedAt "Trusted Provider" badge are computed
       // server-side (see functions/onReviewWritten) from real reviews —
-      // not even the owner may write them directly.
+      // not even the owner may write them directly. Same for subscription
+      // fields, see noSubscriptionSelfWrite().
       allow update: if isAdmin() || (
         signedIn() && providerId == request.auth.uid &&
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(
           ['ratingAvg', 'ratingCount', 'isVerified', 'verifiedAt']
-        )
+        ) && noSubscriptionSelfWrite()
       );
       allow delete: if isAdmin();
     }
