@@ -203,9 +203,11 @@ const AdminOrdersPage: React.FC = () => {
                       {providerNameMap[booking.providerId] || t("admin.notProvided")}
                     </td>
                     <td className="p-3">{booking.serviceName || t("admin.notProvided")}</td>
-                    <td className="p-3 font-medium">{(booking.priceTotal || 0).toFixed(2)} SAR</td>
+                    <td className="p-3 font-medium">
+                      {(Number(booking.priceTotal) || 0).toFixed(2)} SAR
+                    </td>
                     <td className="p-3 text-muted-foreground">
-                      {(commissionByBookingId[booking.id] || 0).toFixed(2)} SAR
+                      {(Number(commissionByBookingId[booking.id]) || 0).toFixed(2)} SAR
                     </td>
                     <td className="p-3 text-muted-foreground">{formatDate(booking.createdAt)}</td>
                     <td className="p-3 text-muted-foreground">

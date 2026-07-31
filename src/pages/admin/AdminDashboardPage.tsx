@@ -81,12 +81,12 @@ const AdminDashboardPage: React.FC = () => {
           profile.accountStatus === "ACTIVE"
         ) {
           activeCount++;
-          const planPrice = profile.subscriptionPrice || 10;
+          const planPrice = Number(profile.subscriptionPrice) || 10;
           totalMRR += planPrice;
 
           // Calculate your profit = money already received from provider
           if (profile.lastSubscriptionPaymentAmount) {
-            yourProfit += profile.lastSubscriptionPaymentAmount;
+            yourProfit += Number(profile.lastSubscriptionPaymentAmount) || 0;
           }
         }
         if (profile.subscriptionStatus === "EXPIRED") {
@@ -144,7 +144,7 @@ const AdminDashboardPage: React.FC = () => {
     payments
       .filter((p) => p.status === "CAPTURED")
       .forEach((p) => {
-        const fee = p.platformFee || 0;
+        const fee = Number(p.platformFee) || 0;
         total += fee;
         const created = new Date(p.createdAt);
         if (
@@ -166,7 +166,7 @@ const AdminDashboardPage: React.FC = () => {
   const totalAmounts = useMemo(() => {
     return payments.reduce<Record<string, number>>((acc, payment) => {
       const currency = payment.currency || "USD";
-      acc[currency] = (acc[currency] || 0) + (payment.amount || 0);
+      acc[currency] = (acc[currency] || 0) + (Number(payment.amount) || 0);
       return acc;
     }, {});
   }, [payments]);
@@ -218,7 +218,7 @@ const AdminDashboardPage: React.FC = () => {
     payments.forEach((payment) => {
       const date = new Date(payment.createdAt);
       const key = keyFor(date);
-      const amount = payment.amountSar || payment.amount || 0;
+      const amount = Number(payment.amountSar || payment.amount) || 0;
       totals.set(key, (totals.get(key) || 0) + amount);
     });
 
@@ -332,7 +332,7 @@ const AdminDashboardPage: React.FC = () => {
 
     const totals = new Map<string, number>();
     source.forEach((payment) => {
-      const amount = payment.amountSar || payment.amount || 0;
+      const amount = Number(payment.amountSar || payment.amount) || 0;
       totals.set(
         payment.providerId,
         (totals.get(payment.providerId) || 0) + amount,
@@ -612,11 +612,13 @@ const AdminDashboardPage: React.FC = () => {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {payment.status} •{" "}
-                        {payment.createdAt.toLocaleDateString()}
+                        {payment.createdAt
+                          ? new Date(payment.createdAt).toLocaleDateString()
+                          : "—"}
                       </p>
                     </div>
                     <p className="text-sm font-semibold">
-                      {payment.amount.toFixed(2)} {payment.currency}
+                      {(Number(payment.amount) || 0).toFixed(2)} {payment.currency}
                     </p>
                   </div>
                 ))}

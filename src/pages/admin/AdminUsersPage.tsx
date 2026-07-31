@@ -154,7 +154,7 @@ const AdminUsersPage: React.FC = () => {
     queryFn: async () => {
       const profiles = await getProvidersByIds(providerUids);
       return profiles.reduce<Record<string, number>>((acc, profile) => {
-        acc[profile.uid] = profile.ratingAvg;
+        acc[profile.uid] = Number(profile.ratingAvg) || 0;
         return acc;
       }, {});
     },
@@ -176,18 +176,18 @@ const AdminUsersPage: React.FC = () => {
   const capturedTotal = useMemo(() => {
     return detailPayments
       .filter((payment) => payment.status === "CAPTURED")
-      .reduce((sum, payment) => sum + (payment.amountSar || payment.amount), 0);
+      .reduce((sum, payment) => sum + (Number(payment.amountSar || payment.amount) || 0), 0);
   }, [detailPayments]);
 
   const authorizedTotal = useMemo(() => {
     return detailPayments
       .filter((payment) => payment.status === "AUTHORIZED")
-      .reduce((sum, payment) => sum + (payment.amountSar || payment.amount), 0);
+      .reduce((sum, payment) => sum + (Number(payment.amountSar || payment.amount) || 0), 0);
   }, [detailPayments]);
 
   const totalAmount = useMemo(() => {
     return detailPayments.reduce(
-      (sum, payment) => sum + (payment.amountSar || payment.amount),
+      (sum, payment) => sum + (Number(payment.amountSar || payment.amount) || 0),
       0,
     );
   }, [detailPayments]);
@@ -808,7 +808,7 @@ const AdminUsersPage: React.FC = () => {
                         {t("admin.ratingSummary")}
                       </p>
                       <p className="text-sm font-medium">
-                        {providerProfile.ratingAvg.toFixed(1)} (
+                        {(Number(providerProfile.ratingAvg) || 0).toFixed(1)} (
                         {providerProfile.ratingCount})
                       </p>
                     </div>
@@ -961,7 +961,7 @@ const AdminUsersPage: React.FC = () => {
                             </p>
                           </div>
                           <p className="text-sm font-semibold">
-                            {(payment.amountSar || payment.amount).toFixed(2)}{" "}
+                            {(Number(payment.amountSar || payment.amount) || 0).toFixed(2)}{" "}
                             SAR
                           </p>
                         </div>
