@@ -27,6 +27,7 @@ import {
   createProviderProfile,
   deleteUserAccount,
   checkPhoneExists,
+  updateLastLogin,
 } from "@/lib/firestore";
 import { User, UserRole } from "@/types";
 
@@ -116,6 +117,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         password,
       );
       const fbUser = userCredential.user;
+
+      // Non-blocking: don't fail login if this write fails.
+      updateLastLogin(fbUser.uid).catch(console.error);
 
       // Get user document from Firestore
       const userDoc = await getUserDocument(fbUser.uid);

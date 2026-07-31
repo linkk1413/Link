@@ -13,6 +13,7 @@ import {
   Phone,
   Mail,
   AlertTriangle,
+  CreditCard,
 } from "lucide-react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
@@ -99,6 +100,9 @@ const AdminSettingsPage: React.FC = () => {
     contactWhatsapp: "",
   });
 
+  // Platform commission (percentage of each booking kept as platformFee)
+  const [commissionPercent, setCommissionPercent] = useState(15);
+
   // Category management state
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -146,6 +150,7 @@ const AdminSettingsPage: React.FC = () => {
         contactPhone: subscriptionSettings.contactPhone || "",
         contactWhatsapp: subscriptionSettings.contactWhatsapp || "",
       });
+      setCommissionPercent(subscriptionSettings.platformCommissionPercent ?? 15);
     }
   }, [subscriptionSettings]);
 
@@ -175,6 +180,18 @@ const AdminSettingsPage: React.FC = () => {
       toast.success(t("admin.subscriptionUpdated"));
     } catch (error) {
       console.error("Failed to update subscription settings:", error);
+      toast.error(t("common.error"));
+    }
+  };
+
+  const handleCommissionUpdate = async () => {
+    try {
+      await updateSubscriptionSettings.mutateAsync({
+        platformCommissionPercent: commissionPercent,
+      });
+      toast.success(t("admin.commissionUpdated"));
+    } catch (error) {
+      console.error("Failed to update commission:", error);
       toast.error(t("common.error"));
     }
   };
@@ -963,6 +980,45 @@ const AdminSettingsPage: React.FC = () => {
             {updateProviderBanner.isPending
               ? t("common.saving")
               : t("admin.updateBanner")}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Platform Commission */}
+      <Card className="mb-8 border-dashed">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            {t("admin.commissionSettings")}
+          </CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            {t("admin.commissionHint")}
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="max-w-xs space-y-2">
+            <Label htmlFor="commission-percent">
+              {t("admin.commissionPercent")} (%)
+            </Label>
+            <Input
+              id="commission-percent"
+              type="number"
+              min="0"
+              max="100"
+              step="0.5"
+              value={commissionPercent}
+              onChange={(e) =>
+                setCommissionPercent(parseFloat(e.target.value) || 0)
+              }
+            />
+          </div>
+          <Button
+            onClick={handleCommissionUpdate}
+            disabled={updateSubscriptionSettings.isPending}
+          >
+            {updateSubscriptionSettings.isPending
+              ? t("common.saving")
+              : t("common.save")}
           </Button>
         </CardContent>
       </Card>

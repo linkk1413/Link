@@ -8,7 +8,7 @@ const {
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { onRequest } = require("firebase-functions/v2/https");
+const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -741,3 +741,55 @@ exports.paypalVoidAuthorization = onRequest(
     }
   },
 );
+
+// =====================
+// Admin account deletion
+// =====================
+
+// Permanently deletes a user: their Firebase Auth account plus their
+// users/{uid} and providers/{uid} Firestore docs. Only an ADMIN may call
+// this — Firestore rules can't do this themselves since deleting an Auth
+// account requires the Admin SDK. Irreversible.
+exports.adminDeleteUser = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) {
+    throw new HttpsError("unauthenticated", "Sign in required.");
+  }
+
+  const callerSnap = await db.collection("users").doc(callerUid).get();
+  const callerRole = callerSnap.exists
+    ? callerSnap.data().activeRole || callerSnap.data().role
+    : null;
+  if (callerRole !== "ADMIN") {
+    throw new HttpsError("permission-denied", "Admin only.");
+  }
+
+  const targetUid = request.data?.uid;
+  if (!targetUid || typeof targetUid !== "string") {
+    throw new HttpsError("invalid-argument", "Missing uid.");
+  }
+  if (targetUid === callerUid) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Admins cannot delete their own account this way.",
+    );
+  }
+
+  try {
+    await admin.auth().deleteUser(targetUid);
+  } catch (error) {
+    // Auth user may already be gone (e.g. retried call) — proceed to clean
+    // up Firestore either way.
+    if (error.code !== "auth/user-not-found") {
+      console.error(`Failed to delete auth user ${targetUid}:`, error);
+      throw new HttpsError("internal", "Failed to delete authentication account.");
+    }
+  }
+
+  const batch = db.batch();
+  batch.delete(db.collection("users").doc(targetUid));
+  batch.delete(db.collection("providers").doc(targetUid));
+  await batch.commit();
+
+  return { success: true };
+});

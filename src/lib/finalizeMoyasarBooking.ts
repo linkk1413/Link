@@ -15,6 +15,7 @@ import {
   createBooking,
   createPayment,
   getPaymentByOrderId,
+  getSubscriptionSettings,
 } from "@/lib/firestore";
 
 export interface MoyasarBookingDraft {
@@ -121,6 +122,15 @@ export async function finalizeMoyasarBooking(params: {
     addressText: draft.addressText,
   });
 
+  // 3b. Platform commission — percentage of the booking price kept by Link,
+  // the rest goes to the provider. Configurable in AdminSettingsPage; only
+  // applied going forward, never retroactively to existing payments.
+  const settings = await getSubscriptionSettings().catch(() => null);
+  const commissionPercent = settings?.platformCommissionPercent ?? 0;
+  const platformFee =
+    Math.round(draft.priceTotal * (commissionPercent / 100) * 100) / 100;
+  const providerAmount = draft.priceTotal - platformFee;
+
   // 4. Record the payment (funds are held until the provider accepts).
   await createPayment({
     bookingId,
@@ -136,9 +146,9 @@ export async function finalizeMoyasarBooking(params: {
     fxRate: 1,
     orderId: paymentId,
     authorizationId: paymentId,
-    platformFee: 0,
+    platformFee,
     gatewayFee: 0,
-    providerAmount: draft.priceTotal,
+    providerAmount,
   });
 
   // 5. Booking confirmation email (non-blocking). The server looks up the

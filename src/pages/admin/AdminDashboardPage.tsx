@@ -2,7 +2,16 @@ import React, { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { Users, CheckCircle, CreditCard, Activity, Gift } from "lucide-react";
+import {
+  Users,
+  CheckCircle,
+  CreditCard,
+  Activity,
+  Gift,
+  Briefcase,
+  XCircle,
+  TrendingUp,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ReactApexChart from "react-apexcharts";
@@ -11,6 +20,7 @@ import { useUsers } from "@/hooks/queries/useUsers";
 import { usePendingVerifications } from "@/hooks/queries/useVerifications";
 import { usePayouts } from "@/hooks/queries/usePayouts";
 import { usePayments } from "@/hooks/queries/usePayments";
+import { useAllBookings } from "@/hooks/queries/useBookings";
 import { getBookings, getProvidersByIds } from "@/lib/firestore";
 import { BookingStatus } from "@/types";
 
@@ -22,6 +32,7 @@ const AdminDashboardPage: React.FC = () => {
   const { data: verifications = [] } = usePendingVerifications();
   const { data: payouts = [] } = usePayouts();
   const { data: payments = [] } = usePayments();
+  const { data: allBookings = [] } = useAllBookings();
 
   const { data: activeBookingsCount = 0 } = useQuery({
     queryKey: ["admin", "bookings", "active"],
@@ -100,6 +111,51 @@ const AdminDashboardPage: React.FC = () => {
     () => verifications.filter((v) => v.status === "PENDING").length,
     [verifications],
   );
+
+  const clientCount = useMemo(
+    () => users.filter((u) => u.roles?.includes("CLIENT") || u.role === "CLIENT").length,
+    [users],
+  );
+  const providerCount = useMemo(
+    () => users.filter((u) => u.roles?.includes("PROVIDER") || u.role === "PROVIDER").length,
+    [users],
+  );
+  const completedBookingsCount = useMemo(
+    () => allBookings.filter((b) => b.status === "COMPLETED").length,
+    [allBookings],
+  );
+  const cancelledBookingsCount = useMemo(
+    () =>
+      allBookings.filter((b) =>
+        ["CANCELLED_BY_CLIENT", "CANCELLED_BY_PROVIDER", "REJECTED"].includes(
+          b.status,
+        ),
+      ).length,
+    [allBookings],
+  );
+
+  // Platform profit = sum of platformFee on captured payments. Only
+  // meaningful for bookings made after commission was activated (see
+  // finalizeMoyasarBooking.ts) — older payments have platformFee 0.
+  const { totalProfit, monthlyProfit } = useMemo(() => {
+    const now = new Date();
+    let total = 0;
+    let monthly = 0;
+    payments
+      .filter((p) => p.status === "CAPTURED")
+      .forEach((p) => {
+        const fee = p.platformFee || 0;
+        total += fee;
+        const created = new Date(p.createdAt);
+        if (
+          created.getFullYear() === now.getFullYear() &&
+          created.getMonth() === now.getMonth()
+        ) {
+          monthly += fee;
+        }
+      });
+    return { totalProfit: total, monthlyProfit: monthly };
+  }, [payments]);
 
   const pendingPayouts = useMemo(
     () => payouts.filter((p) => p.status === "REQUESTED").length,
@@ -406,9 +462,15 @@ const AdminDashboardPage: React.FC = () => {
   const stats = [
     {
       icon: <Users className="h-6 w-6" />,
-      label: t("admin.totalUsers"),
-      value: users.length.toString(),
+      label: t("admin.clientCount"),
+      value: clientCount.toString(),
       color: "bg-blue-500",
+    },
+    {
+      icon: <Briefcase className="h-6 w-6" />,
+      label: t("admin.providerCount"),
+      value: providerCount.toString(),
+      color: "bg-indigo-500",
     },
     {
       icon: <CheckCircle className="h-6 w-6" />,
@@ -423,6 +485,18 @@ const AdminDashboardPage: React.FC = () => {
       color: "bg-primary",
     },
     {
+      icon: <CheckCircle className="h-6 w-6" />,
+      label: t("admin.completedOrders"),
+      value: completedBookingsCount.toString(),
+      color: "bg-teal-600",
+    },
+    {
+      icon: <XCircle className="h-6 w-6" />,
+      label: t("admin.cancelledOrders"),
+      value: cancelledBookingsCount.toString(),
+      color: "bg-rose-600",
+    },
+    {
       icon: <Gift className="h-6 w-6" />,
       label: t("admin.activeSubscriptions"),
       value: subscriptionStats.active.toString(),
@@ -435,10 +509,22 @@ const AdminDashboardPage: React.FC = () => {
       color: "bg-blue-600",
     },
     {
+      icon: <TrendingUp className="h-6 w-6" />,
+      label: t("admin.totalPlatformProfit"),
+      value: `${totalProfit.toFixed(0)} SAR`,
+      color: "bg-green-600",
+    },
+    {
+      icon: <TrendingUp className="h-6 w-6" />,
+      label: t("admin.monthlyPlatformProfit"),
+      value: `${monthlyProfit.toFixed(0)} SAR`,
+      color: "bg-emerald-600",
+    },
+    {
       icon: <CreditCard className="h-6 w-6" />,
       label: t("admin.yourProfit"),
       value: `${subscriptionStats.yourProfit.toFixed(0)} SAR`,
-      color: "bg-green-600",
+      color: "bg-cyan-600",
     },
     {
       icon: <CreditCard className="h-6 w-6" />,

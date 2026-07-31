@@ -194,6 +194,14 @@ export const getUserDocument = async (uid: string): Promise<User | null> => {
   };
 };
 
+// Stamp the user's last sign-in time (called from AuthContext on login).
+// Non-blocking by convention at the call site — a failed write here
+// shouldn't fail login.
+export const updateLastLogin = async (uid: string): Promise<void> => {
+  const userRef = doc(db, COLLECTIONS.USERS, uid);
+  await updateDoc(userRef, { lastLoginAt: serverTimestamp() });
+};
+
 // Update user role in Firestore (legacy - kept for compatibility)
 export const updateUserRole = async (
   uid: string,
@@ -2106,6 +2114,9 @@ export interface SubscriptionSettings {
   contactEmail?: string;
   contactPhone?: string;
   contactWhatsapp?: string;
+  // Percentage of each booking's price kept as platform commission
+  // (Payment.platformFee), applied when a booking payment is finalized.
+  platformCommissionPercent?: number;
   updatedAt?: Date;
 }
 
@@ -2129,6 +2140,7 @@ const DEFAULT_SUBSCRIPTION_SETTINGS: SubscriptionSettings = {
       isActive: true,
     },
   ],
+  platformCommissionPercent: 15,
   contactEmail: "support@linkbloom.com",
   contactPhone: "+966 55 297 9710",
   contactWhatsapp: "https://wa.me/966552979710",
@@ -2150,6 +2162,9 @@ export const getSubscriptionSettings =
           contactEmail: data.contactEmail ?? DEFAULT_SUBSCRIPTION_SETTINGS.contactEmail,
           contactPhone: data.contactPhone ?? DEFAULT_SUBSCRIPTION_SETTINGS.contactPhone,
           contactWhatsapp: data.contactWhatsapp ?? DEFAULT_SUBSCRIPTION_SETTINGS.contactWhatsapp,
+          platformCommissionPercent:
+            data.platformCommissionPercent ??
+            DEFAULT_SUBSCRIPTION_SETTINGS.platformCommissionPercent,
           updatedAt: data.updatedAt
             ? timestampToDate(data.updatedAt)
             : undefined,

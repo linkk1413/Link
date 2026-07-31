@@ -19,6 +19,7 @@ import { useCreateBooking } from "@/hooks/queries/useBookings";
 import { useCreatePayment } from "@/hooks/queries/usePayments";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatServiceDuration } from "@/lib/duration";
+import { getSubscriptionSettings } from "@/lib/firestore";
 import MoyasarCheckout from "@/components/payments/MoyasarCheckout";
 import {
   finalizeMoyasarBooking,
@@ -228,6 +229,11 @@ const BookingPage: React.FC = () => {
             : t("services.atClient"),
       });
 
+      const settings = await getSubscriptionSettings().catch(() => null);
+      const commissionPercent = settings?.platformCommissionPercent ?? 0;
+      const platformFee =
+        Math.round(service.price * (commissionPercent / 100) * 100) / 100;
+
       await createPaymentMutation.mutateAsync({
         bookingId,
         clientId: user.uid,
@@ -242,9 +248,9 @@ const BookingPage: React.FC = () => {
         fxRate: 1,
         orderId: chargeId,
         authorizationId: chargeId,
-        platformFee: 0,
+        platformFee,
         gatewayFee: 0,
-        providerAmount: service.price,
+        providerAmount: service.price - platformFee,
       });
 
       // Send booking confirmation email. The server looks up the real

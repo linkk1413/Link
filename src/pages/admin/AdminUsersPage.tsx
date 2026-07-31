@@ -12,7 +12,15 @@ import {
   CheckCircle,
   CreditCard,
   UserCog,
+  Pencil,
+  Trash2,
+  Star,
+  Phone,
+  MapPin,
+  Calendar,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -43,12 +51,18 @@ import {
   useUsers,
   useUpdateUserStatus,
   useUpdateUserRole,
+  useAdminUpdateUserProfile,
+  useDeleteUserAccount,
+  useUserActivityCounts,
 } from "@/hooks/queries/useUsers";
 import {
   usePaymentsByClient,
   usePaymentsByProvider,
 } from "@/hooks/queries/usePayments";
 import { useProviderProfile } from "@/hooks/queries/useProviders";
+import { getProvidersByIds } from "@/lib/firestore";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "@/components/ui/sonner";
 import { User as UserType, UserRole, UserStatus } from "@/types";
 import {
   getCityLabel,
@@ -75,15 +89,51 @@ const AdminUsersPage: React.FC = () => {
     user: UserType | null;
     newRole: UserRole;
   }>({ open: false, user: null, newRole: "CLIENT" });
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    phone: "",
+    region: "",
+    city: "",
+    district: "",
+  });
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    user: UserType | null;
+    confirmed: boolean;
+  }>({ open: false, user: null, confirmed: false });
 
   // Fetch users
   const { data: users = [], isLoading } = useUsers();
   const updateStatusMutation = useUpdateUserStatus();
   const updateRoleMutation = useUpdateUserRole();
+  const updateProfileMutation = useAdminUpdateUserProfile();
+  const deleteAccountMutation = useDeleteUserAccount();
   const detailsUserId = detailsUser?.uid || "";
   const { data: providerProfile } = useProviderProfile(detailsUserId);
   const { data: providerPayments = [] } = usePaymentsByProvider(detailsUserId);
   const { data: clientPayments = [] } = usePaymentsByClient(detailsUserId);
+  const { data: activityCounts } = useUserActivityCounts(detailsUserId);
+
+  // Batched (not per-row) provider rating lookup for the list — avoids N+1.
+  const providerUids = useMemo(
+    () =>
+      users
+        .filter((u) => u.roles?.includes("PROVIDER") || u.role === "PROVIDER")
+        .map((u) => u.uid),
+    [users],
+  );
+  const { data: providerRatings = {} } = useQuery({
+    queryKey: ["admin", "users", "provider-ratings", providerUids],
+    queryFn: async () => {
+      const profiles = await getProvidersByIds(providerUids);
+      return profiles.reduce<Record<string, number>>((acc, profile) => {
+        acc[profile.uid] = profile.ratingAvg;
+        return acc;
+      }, {});
+    },
+    enabled: providerUids.length > 0,
+  });
 
   const isProviderDetails =
     detailsUser?.role === "PROVIDER" || Boolean(providerProfile);
@@ -166,6 +216,50 @@ const AdminUsersPage: React.FC = () => {
   const openUserDetails = (user: UserType) => {
     setDetailsUser(user);
     setDetailsDialogOpen(true);
+  };
+
+  const openEditDialog = (user: UserType) => {
+    setDetailsUser(user);
+    setEditForm({
+      name: user.name || "",
+      phone: user.phone || "",
+      region: user.region || "",
+      city: user.city || "",
+      district: user.district || "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const confirmEditUser = async () => {
+    if (!detailsUser) return;
+    try {
+      await updateProfileMutation.mutateAsync({
+        userId: detailsUser.uid,
+        updates: editForm,
+      });
+      toast.success(t("common.success"));
+      setEditDialogOpen(false);
+    } catch (error) {
+      console.error("Failed to update user:", error);
+      toast.error(t("common.error"));
+    }
+  };
+
+  const openDeleteDialog = (user: UserType) => {
+    setDeleteDialog({ open: true, user, confirmed: false });
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deleteDialog.user || !deleteDialog.confirmed) return;
+    try {
+      await deleteAccountMutation.mutateAsync(deleteDialog.user.uid);
+      toast.success(t("admin.accountDeleted"));
+      setDeleteDialog({ open: false, user: null, confirmed: false });
+      setDetailsDialogOpen(false);
+    } catch (error) {
+      console.error("Failed to delete account:", error);
+      toast.error(t("common.error"));
+    }
   };
 
   const handleViewPayments = (user: UserType) => {
@@ -388,7 +482,28 @@ const AdminUsersPage: React.FC = () => {
                     <p className="text-sm text-muted-foreground">
                       {user.email}
                     </p>
-                    <div className="mt-1 flex items-center gap-2">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      {user.phone && (
+                        <span className="flex items-center gap-1">
+                          <Phone className="h-3 w-3" /> {user.phone}
+                        </span>
+                      )}
+                      {user.city && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" /> {user.city}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" /> {formatDate(user.createdAt)}
+                      </span>
+                      {providerRatings[user.uid] !== undefined && (
+                        <span className="flex items-center gap-1">
+                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                          {providerRatings[user.uid].toFixed(1)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
                       {getRoleBadge(user.role, user.roles)}
                       {getStatusBadge(user.status)}
                     </div>
@@ -451,6 +566,25 @@ const AdminUsersPage: React.FC = () => {
                     >
                       <UserCog className="me-2 h-4 w-4" />
                       {t("admin.changeRole")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openEditDialog(user);
+                      }}
+                    >
+                      <Pencil className="me-2 h-4 w-4" />
+                      {t("admin.editUser")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openDeleteDialog(user);
+                      }}
+                    >
+                      <Trash2 className="me-2 h-4 w-4" />
+                      {t("admin.deleteAccount")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -527,6 +661,32 @@ const AdminUsersPage: React.FC = () => {
                   </p>
                   <p className="text-sm font-medium">
                     {detailsUser ? formatDate(detailsUser.createdAt) : ""}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("admin.lastLogin")}
+                  </p>
+                  <p className="text-sm font-medium">
+                    {detailsUser?.lastLoginAt
+                      ? formatDate(detailsUser.lastLoginAt)
+                      : t("admin.notProvided")}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("admin.orderCount")}
+                  </p>
+                  <p className="text-sm font-medium">
+                    {activityCounts?.bookingCount ?? "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("admin.reportCount")}
+                  </p>
+                  <p className="text-sm font-medium">
+                    {activityCounts?.reportCount ?? "—"}
                   </p>
                 </div>
                 <div className="sm:col-span-2">
@@ -777,12 +937,139 @@ const AdminUsersPage: React.FC = () => {
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button
               variant="outline"
               onClick={() => setDetailsDialogOpen(false)}
             >
               {t("common.close")}
+            </Button>
+            {detailsUser && (
+              <Button onClick={() => openEditDialog(detailsUser)}>
+                <Pencil className="me-2 h-4 w-4" />
+                {t("admin.editUser")}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("admin.editUser")}</DialogTitle>
+            <DialogDescription>{detailsUser?.name}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">{t("profile.fullName")}</Label>
+              <Input
+                id="edit-name"
+                value={editForm.name}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, name: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">{t("profile.phone")}</Label>
+              <Input
+                id="edit-phone"
+                value={editForm.phone}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, phone: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-city">{t("profile.city")}</Label>
+              <Input
+                id="edit-city"
+                value={editForm.city}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, city: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-region">{t("profile.region")}</Label>
+              <Input
+                id="edit-region"
+                value={editForm.region}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, region: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-district">{t("profile.district")}</Label>
+              <Input
+                id="edit-district"
+                value={editForm.district}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, district: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={confirmEditUser}
+              disabled={updateProfileMutation.isPending}
+            >
+              {t("common.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Account Dialog — most destructive action on this page */}
+      <Dialog
+        open={deleteDialog.open}
+        onOpenChange={(open) =>
+          setDeleteDialog({ open, user: open ? deleteDialog.user : null, confirmed: false })
+        }
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">
+              {t("admin.deleteAccountTitle")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("admin.deleteAccountWarning", { name: deleteDialog.user?.name })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+            <Checkbox
+              id="confirm-delete"
+              checked={deleteDialog.confirmed}
+              onCheckedChange={(checked) =>
+                setDeleteDialog((prev) => ({ ...prev, confirmed: checked === true }))
+              }
+            />
+            <Label htmlFor="confirm-delete" className="text-sm">
+              {t("admin.deleteAccountConfirmCheckbox")}
+            </Label>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() =>
+                setDeleteDialog({ open: false, user: null, confirmed: false })
+              }
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteUser}
+              disabled={!deleteDialog.confirmed || deleteAccountMutation.isPending}
+            >
+              {t("admin.deleteAccount")}
             </Button>
           </DialogFooter>
         </DialogContent>

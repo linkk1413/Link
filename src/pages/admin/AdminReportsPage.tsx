@@ -10,6 +10,8 @@ import {
   Trash2,
   Loader2,
   AlertTriangle,
+  Ban,
+  UserX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +35,10 @@ import {
   useDeleteReviewReply,
   useReviewById,
 } from "@/hooks/queries/useReviews";
+import {
+  useUpdateUserStatus,
+  useDeleteUserAccount,
+} from "@/hooks/queries/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
 import { Report, ReportStatus } from "@/types";
 import { toast } from "sonner";
@@ -47,6 +53,8 @@ const AdminReportsPage: React.FC = () => {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [adminNotes, setAdminNotes] = useState("");
+  const [suspendConfirmOpen, setSuspendConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const { data: reports = [], isLoading } = useReports(
     statusTab === "ALL" ? undefined : (statusTab as ReportStatus),
@@ -54,6 +62,8 @@ const AdminReportsPage: React.FC = () => {
   const updateStatus = useUpdateReportStatus();
   const deleteReview = useDeleteReview();
   const deleteReply = useDeleteReviewReply();
+  const suspendUser = useUpdateUserStatus();
+  const deleteUserAccount = useDeleteUserAccount();
 
   // For a reported review we load the review itself: the report's targetOwnerId
   // is whoever wrote the reported content (the client), not the provider whose
@@ -61,6 +71,13 @@ const AdminReportsPage: React.FC = () => {
   const reportedReviewId =
     selectedReport?.targetType === "REVIEW" ? selectedReport.targetId : "";
   const { data: reportedReview } = useReviewById(reportedReviewId);
+
+  // The order linked to this report, if any: either the report targets a
+  // booking directly, or it targets a review that itself references one.
+  const relatedOrderId =
+    selectedReport?.targetType === "BOOKING"
+      ? selectedReport.targetId
+      : reportedReview?.bookingId;
 
   const filteredReports = useMemo(() => {
     if (!searchQuery.trim()) return reports;
@@ -148,6 +165,34 @@ const AdminReportsPage: React.FC = () => {
       setDetailOpen(false);
     } catch (error) {
       console.error("Delete reply error:", error);
+      toast.error(t("common.error"));
+    }
+  };
+
+  const handleSuspendReportedUser = async () => {
+    if (!selectedReport?.targetOwnerId) return;
+    try {
+      await suspendUser.mutateAsync({
+        userId: selectedReport.targetOwnerId,
+        status: "SUSPENDED",
+      });
+      toast.success(t("admin.accountSuspendedShort"));
+      setSuspendConfirmOpen(false);
+    } catch (error) {
+      console.error("Failed to suspend user:", error);
+      toast.error(t("common.error"));
+    }
+  };
+
+  const handleDeleteReportedUser = async () => {
+    if (!selectedReport?.targetOwnerId) return;
+    try {
+      await deleteUserAccount.mutateAsync(selectedReport.targetOwnerId);
+      toast.success(t("admin.accountDeleted"));
+      setDeleteConfirmOpen(false);
+      setDetailOpen(false);
+    } catch (error) {
+      console.error("Failed to delete user:", error);
       toast.error(t("common.error"));
     }
   };
@@ -382,6 +427,16 @@ const AdminReportsPage: React.FC = () => {
                 </div>
               )}
 
+              {/* Related order, if any */}
+              {relatedOrderId && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">
+                    {t("admin.orderRef")}
+                  </Label>
+                  <p className="font-mono text-sm">{relatedOrderId}</p>
+                </div>
+              )}
+
               {/* Reported Content */}
               {selectedReport.targetContent && (
                 <div>
@@ -481,6 +536,27 @@ const AdminReportsPage: React.FC = () => {
                     </div>
                   )}
 
+                  {selectedReport.targetOwnerId && (
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                      <Button
+                        variant="outline"
+                        className="text-destructive"
+                        onClick={() => setSuspendConfirmOpen(true)}
+                      >
+                        <Ban className="h-4 w-4 mr-2" />
+                        {t("admin.suspendUser")}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="text-destructive"
+                        onClick={() => setDeleteConfirmOpen(true)}
+                      >
+                        <UserX className="h-4 w-4 mr-2" />
+                        {t("admin.deleteAccount")}
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="flex gap-2 w-full sm:w-auto sm:ms-auto">
                     <Button
                       variant="outline"
@@ -514,6 +590,60 @@ const AdminReportsPage: React.FC = () => {
                   {t("adminReports.alreadyHandled")}
                 </p>
               )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Suspend reported user confirmation */}
+      <Dialog open={suspendConfirmOpen} onOpenChange={setSuspendConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("admin.suspendTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("admin.suspendDescription", {
+                name: selectedReport?.targetOwnerName,
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSuspendConfirmOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleSuspendReportedUser}
+              disabled={suspendUser.isPending}
+            >
+              {t("admin.suspend")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete reported user confirmation */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">
+              {t("admin.deleteAccountTitle")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("admin.deleteAccountWarning", {
+                name: selectedReport?.targetOwnerName,
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteReportedUser}
+              disabled={deleteUserAccount.isPending}
+            >
+              {t("admin.deleteAccount")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

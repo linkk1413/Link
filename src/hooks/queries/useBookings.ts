@@ -47,6 +47,15 @@ export const usePendingBookings = (providerId: string) => {
   });
 };
 
+// Admin: every booking in the platform (no filter — firestore.rules already
+// grants isAdmin() a blanket read on /bookings).
+export const useAllBookings = () => {
+  return useQuery<Booking[], Error>({
+    queryKey: bookingKeys.all,
+    queryFn: () => getBookings({}),
+  });
+};
+
 // Fetch a single booking by ID
 export const useBooking = (id: string) => {
   return useQuery<Booking | null, Error>({

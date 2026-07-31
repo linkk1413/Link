@@ -3,13 +3,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   collection,
   query,
+  where,
   getDocs,
+  getCountFromServer,
   doc,
   getDoc,
   updateDoc,
   orderBy,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "@/lib/firebase";
 import { User, UserRole, UserStatus } from "@/types";
 
 // Query keys
@@ -184,5 +187,73 @@ export const useUpdateUserRole = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.all });
     },
+  });
+};
+
+// Admin edits a user's basic profile fields (Firestore only — email/password
+// live in Firebase Auth and aren't touched here).
+export const useAdminUpdateUserProfile = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      userId,
+      updates,
+    }: {
+      userId: string;
+      updates: Partial<Pick<User, "name" | "phone" | "region" | "city" | "district">>;
+    }) => {
+      const userRef = doc(db, "users", userId);
+      await updateDoc(userRef, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.all });
+    },
+  });
+};
+
+// Permanently deletes a user (Auth account + Firestore docs) via the
+// adminDeleteUser Cloud Function — a client SDK can never delete another
+// user's Auth account, only the Admin SDK can.
+export const useDeleteUserAccount = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const call = httpsCallable(functions, "adminDeleteUser");
+      await call({ uid: userId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.all });
+    },
+  });
+};
+
+// Counts for the user-details panel: bookings as client, bookings as
+// provider, and reports filed against this account. Uses count() aggregation
+// queries so it never reads full documents — cheap enough to run on demand
+// when the details dialog opens (not in the main list).
+export const useUserActivityCounts = (userId: string) => {
+  return useQuery({
+    queryKey: ["users", "activity-counts", userId],
+    queryFn: async () => {
+      const [clientBookings, providerBookings, reports] = await Promise.all([
+        getCountFromServer(
+          query(collection(db, "bookings"), where("clientId", "==", userId)),
+        ),
+        getCountFromServer(
+          query(collection(db, "bookings"), where("providerId", "==", userId)),
+        ),
+        getCountFromServer(
+          query(collection(db, "reports"), where("targetOwnerId", "==", userId)),
+        ),
+      ]);
+
+      return {
+        bookingCount: clientBookings.data().count + providerBookings.data().count,
+        reportCount: reports.data().count,
+      };
+    },
+    enabled: !!userId,
   });
 };

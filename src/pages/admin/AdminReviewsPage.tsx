@@ -30,6 +30,7 @@ import {
   useDeleteReview,
   useDeleteReviewReply,
 } from "@/hooks/queries/useReviews";
+import { useUsers } from "@/hooks/queries/useUsers";
 import { Review } from "@/types";
 import { toast } from "sonner";
 
@@ -45,8 +46,18 @@ const AdminReviewsPage: React.FC = () => {
   const [pending, setPending] = useState<PendingAction | null>(null);
 
   const { data: reviews = [], isLoading } = useAllReviews();
+  const { data: users = [] } = useUsers();
   const deleteReview = useDeleteReview();
   const deleteReply = useDeleteReviewReply();
+
+  const providerNameMap = useMemo(() => {
+    return users.reduce<Record<string, string>>((acc, user) => {
+      if (user.uid) {
+        acc[user.uid] = user.displayName || user.name || user.email || "";
+      }
+      return acc;
+    }, {});
+  }, [users]);
 
   const filteredReviews = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -56,17 +67,19 @@ const AdminReviewsPage: React.FC = () => {
         (filter === "WITH_REPLY" && !!review.providerReply) ||
         (filter === "LOW_RATED" && review.rating <= 2);
 
+      const providerName = providerNameMap[review.providerId] || "";
       const matchesSearch =
         !q ||
         review.clientName?.toLowerCase().includes(q) ||
         review.serviceName?.toLowerCase().includes(q) ||
         review.comment?.toLowerCase().includes(q) ||
         review.providerReply?.toLowerCase().includes(q) ||
-        review.providerId?.toLowerCase().includes(q);
+        review.providerId?.toLowerCase().includes(q) ||
+        providerName.toLowerCase().includes(q);
 
       return matchesFilter && matchesSearch;
     });
-  }, [reviews, filter, searchQuery]);
+  }, [reviews, filter, searchQuery, providerNameMap]);
 
   const confirmDelete = async () => {
     if (!pending) return;
@@ -179,6 +192,24 @@ const AdminReviewsPage: React.FC = () => {
                         </span>
                         {review.serviceName && (
                           <Badge variant="outline">{review.serviceName}</Badge>
+                        )}
+                      </div>
+
+                      <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span>
+                          {t("admin.provider")}:{" "}
+                          <span className="text-foreground">
+                            {providerNameMap[review.providerId] ||
+                              t("admin.notProvided")}
+                          </span>
+                        </span>
+                        {review.bookingId && (
+                          <span>
+                            {t("admin.orderRef")}:{" "}
+                            <span className="font-mono text-foreground">
+                              {review.bookingId}
+                            </span>
+                          </span>
                         )}
                       </div>
 
