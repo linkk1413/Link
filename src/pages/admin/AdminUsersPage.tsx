@@ -18,6 +18,10 @@ import {
   Phone,
   MapPin,
   Calendar,
+  MessageSquare,
+  Mail,
+  Eye,
+  AlertTriangle,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -60,10 +64,15 @@ import {
   usePaymentsByProvider,
 } from "@/hooks/queries/usePayments";
 import { useProviderProfile } from "@/hooks/queries/useProviders";
+import {
+  useClientChats,
+  useProviderChats,
+  useChatMessages,
+} from "@/hooks/queries/useChats";
 import { getProvidersByIds } from "@/lib/firestore";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
-import { User as UserType, UserRole, UserStatus } from "@/types";
+import { User as UserType, UserRole, UserStatus, Chat } from "@/types";
 import {
   getCityLabel,
   getDistrictLabel,
@@ -102,6 +111,7 @@ const AdminUsersPage: React.FC = () => {
     user: UserType | null;
     confirmed: boolean;
   }>({ open: false, user: null, confirmed: false });
+  const [viewingChat, setViewingChat] = useState<Chat | null>(null);
 
   // Fetch users
   const { data: users = [], isLoading } = useUsers();
@@ -114,6 +124,22 @@ const AdminUsersPage: React.FC = () => {
   const { data: providerPayments = [] } = usePaymentsByProvider(detailsUserId);
   const { data: clientPayments = [] } = usePaymentsByClient(detailsUserId);
   const { data: activityCounts } = useUserActivityCounts(detailsUserId);
+
+  // Every conversation this user is part of, on either side.
+  const { data: chatsAsClient = [] } = useClientChats(detailsUserId);
+  const { data: chatsAsProvider = [] } = useProviderChats(detailsUserId);
+  const userChats = useMemo(
+    () => [...chatsAsClient, ...chatsAsProvider],
+    [chatsAsClient, chatsAsProvider],
+  );
+  const { data: viewingMessages = [], isLoading: loadingViewingMessages } =
+    useChatMessages(viewingChat?.id || "");
+
+  // uid -> user, for showing phone/email of both sides of a conversation.
+  const usersByUid = useMemo(
+    () => new Map(users.map((u) => [u.uid, u])),
+    [users],
+  );
 
   // Batched (not per-row) provider rating lookup for the list — avoids N+1.
   const providerUids = useMemo(
@@ -367,6 +393,15 @@ const AdminUsersPage: React.FC = () => {
       year: "numeric",
       month: "short",
       day: "numeric",
+    });
+
+  const formatDateTime = (date: Date) =>
+    new Date(date).toLocaleString(isArabic ? "ar-SA" : "en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
 
   return (
@@ -936,6 +971,47 @@ const AdminUsersPage: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Conversations — who this account has been messaging, so an
+                admin can jump straight to a conversation and see both
+                sides' contact info without hunting through the Chats page. */}
+            <div className="rounded-lg border border-border p-4">
+              <h3 className="mb-3 text-sm font-semibold text-foreground">
+                {t("admin.userConversations")}
+              </h3>
+              {userChats.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {t("admin.noChats")}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {userChats.map((chat) => {
+                    const isClientSide = chat.clientId === detailsUserId;
+                    const otherName = isClientSide
+                      ? chat.providerName
+                      : chat.clientName;
+                    return (
+                      <button
+                        key={chat.id}
+                        type="button"
+                        onClick={() => setViewingChat(chat)}
+                        className="flex w-full items-center justify-between rounded-lg bg-muted/50 p-3 text-start hover:bg-accent"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground">
+                            {otherName || t("admin.notProvided")}
+                          </p>
+                          <p className="line-clamp-1 text-xs text-muted-foreground">
+                            {chat.lastMessage || t("admin.noMessagesYet")}
+                          </p>
+                        </div>
+                        <Eye className="ms-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter className="gap-2">
             <Button
@@ -950,6 +1026,117 @@ const AdminUsersPage: React.FC = () => {
                 {t("admin.editUser")}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Conversation thread + contact info for both participants */}
+      <Dialog
+        open={!!viewingChat}
+        onOpenChange={(open) => !open && setViewingChat(null)}
+      >
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {viewingChat?.clientName} ↔ {viewingChat?.providerName}
+            </DialogTitle>
+            <DialogDescription>
+              {viewingChat?.bookingId
+                ? `${t("admin.orderRef")}: ${viewingChat.bookingId}`
+                : t("admin.noOrderLinked")}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Both participants' account name + contact info */}
+          <div className="grid gap-3 border-b border-border pb-3 sm:grid-cols-2">
+            {viewingChat &&
+              [
+                { uid: viewingChat.clientId, roleLabel: t("roles.client") },
+                {
+                  uid: viewingChat.providerId,
+                  roleLabel: t("roles.provider"),
+                },
+              ].map(({ uid, roleLabel }) => {
+                const person = usersByUid.get(uid);
+                return (
+                  <div key={uid} className="rounded-lg bg-muted/50 p-3 text-sm">
+                    <Badge variant="outline" className="mb-1">
+                      {roleLabel}
+                    </Badge>
+                    <p className="font-medium text-foreground">
+                      {person?.name || t("admin.notProvided")}
+                    </p>
+                    {person?.phone && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                        <Phone className="h-3 w-3" /> {person.phone}
+                      </p>
+                    )}
+                    {person?.email && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                        <Mail className="h-3 w-3" /> {person.email}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+
+          <div className="flex-1 overflow-y-auto py-2">
+            {loadingViewingMessages ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                ))}
+              </div>
+            ) : viewingMessages.length === 0 ? (
+              <p className="py-8 text-center text-muted-foreground">
+                {t("admin.noMessagesYet")}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {viewingMessages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`rounded-lg p-3 ${
+                      message.flaggedContactInfo
+                        ? "bg-amber-50 dark:bg-amber-900/20"
+                        : "bg-muted/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {message.senderId === viewingChat?.clientId
+                        ? viewingChat?.clientName || t("roles.client")
+                        : viewingChat?.providerName || t("roles.provider")}
+                      <span>•</span>
+                      {formatDateTime(message.createdAt)}
+                      {message.flaggedContactInfo && (
+                        <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                          <AlertTriangle className="h-3 w-3" />
+                          {t("admin.flaggedContactInfo")}
+                        </span>
+                      )}
+                    </div>
+                    {message.type === "IMAGE" ? (
+                      <img
+                        src={message.imageUrl}
+                        alt="attachment"
+                        className="mt-1 h-24 w-24 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <p className="mt-1 break-words text-sm text-foreground">
+                        {message.text}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewingChat(null)}>
+              {t("common.close")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

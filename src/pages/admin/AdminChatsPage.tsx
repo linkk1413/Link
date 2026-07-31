@@ -58,8 +58,11 @@ const AdminChatsPage: React.FC = () => {
     );
   }, [chats, searchQuery]);
 
-  const flaggedCount = (chat: Chat) =>
-    chat.id === selectedChat?.id
+  // Note: this runs on every render (including while the dialog is closed
+  // and selectedChat is null), since the JSX below is always evaluated
+  // regardless of the Dialog's open state — must never assume chat is set.
+  const flaggedCount = (chat: Chat | null) =>
+    chat && chat.id === selectedChat?.id
       ? messages.filter((m) => m.flaggedContactInfo).length
       : 0;
 
@@ -204,11 +207,11 @@ const AdminChatsPage: React.FC = () => {
               {selectedChat?.bookingId
                 ? `${t("admin.orderRef")}: ${selectedChat.bookingId}`
                 : t("admin.noOrderLinked")}
-              {flaggedCount(selectedChat as Chat) > 0 && (
+              {flaggedCount(selectedChat) > 0 && (
                 <span className="ms-2 inline-flex items-center gap-1 text-amber-600">
                   <AlertTriangle className="h-3 w-3" />
                   {t("admin.flaggedMessagesCount", {
-                    count: flaggedCount(selectedChat as Chat),
+                    count: flaggedCount(selectedChat),
                   })}
                 </span>
               )}

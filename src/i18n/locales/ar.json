@@ -587,6 +587,7 @@
     "changeRoleTitle": "تغيير دور المستخدم",
     "changeRoleDescription": "حدد دور جديد لـ {{name}}. هذا يستبدل دورها/دوره الحالي.",
     "editUser": "تعديل البيانات",
+    "userConversations": "المحادثات",
     "deleteAccount": "حذف الحساب",
     "deleteAccountTitle": "حذف هذا الحساب نهائيًا؟",
     "deleteAccountWarning": "هذا يحذف حساب {{name}} وبياناته نهائيًا. لا يمكن التراجع عن هذا الإجراء.",

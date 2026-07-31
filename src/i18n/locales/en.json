@@ -587,6 +587,7 @@
     "changeRoleTitle": "Change user role",
     "changeRoleDescription": "Set a new role for {{name}}. This replaces their current role(s).",
     "editUser": "Edit Info",
+    "userConversations": "Conversations",
     "deleteAccount": "Delete Account",
     "deleteAccountTitle": "Permanently delete this account?",
     "deleteAccountWarning": "This permanently deletes {{name}}'s login and profile. It cannot be undone.",
