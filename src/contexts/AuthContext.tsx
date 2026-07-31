@@ -174,16 +174,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         await sendEmailVerification(fbUser);
 
-        // Also send verification email via Resend (our branded email)
+        // Also send verification email via Resend (our branded email). The
+        // server builds the actual link itself from this code — it will not
+        // accept a full link from us.
         try {
-          const verificationLink = `${window.location.origin}/auth/verify-email?code=${fbUser.uid}`;
           await fetch("/api/auth/send-verification-email", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               email,
               name: name || email.split("@")[0],
-              verificationLink,
+              code: fbUser.uid,
             }),
           });
         } catch (resendError) {

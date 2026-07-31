@@ -74,6 +74,8 @@ export interface User {
   district?: string;
   notificationsEnabled?: boolean;
   createdAt: Date;
+  // Written by AuthContext on successful sign-in.
+  lastLoginAt?: Date;
 }
 
 // Provider profile
@@ -116,6 +118,9 @@ export interface ProviderProfile {
   lastSubscriptionPaymentDate?: Date;
   lastSubscriptionPaymentAmount?: number;
   lastSubscriptionPaymentMethod?: "BANK_TRANSFER" | "CARD" | "OTHER";
+  // Weekly working hours + one-off overrides, set on ProviderSchedulePage.
+  availabilityRules?: AvailabilityRule[];
+  availabilityExceptions?: AvailabilityException[];
 }
 
 // Category
@@ -257,6 +262,10 @@ export interface Message {
   imageUrl?: string;
   createdAt: Date;
   readAt?: Date;
+  // Set at send time when the text looks like a phone number / WhatsApp /
+  // social handle — flagged for admin review, sending is never blocked.
+  flaggedContactInfo?: boolean;
+  flaggedMatch?: string;
 }
 
 // Review

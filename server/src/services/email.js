@@ -118,6 +118,33 @@ const emailTemplates = {
       </div>
     `,
   }),
+
+  // Internal admin notification for a provider subscription payment
+  adminSubscriptionNotification: (
+    providerName,
+    providerEmail,
+    providerId,
+    planName,
+    planMonths,
+    amount,
+    orderId,
+    gateway,
+  ) => ({
+    subject: `New subscription payment: ${providerName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #333; margin-bottom: 20px;">New Subscription Payment</h1>
+        <div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px; margin: 20px 0;">
+          <p><strong>Provider:</strong> ${providerName} (${providerEmail})</p>
+          <p><strong>Provider ID:</strong> ${providerId}</p>
+          <p><strong>Plan:</strong> ${planName} (${planMonths} month(s))</p>
+          <p><strong>Amount:</strong> ${amount} SAR</p>
+          <p><strong>Order ID:</strong> ${orderId}</p>
+          <p><strong>Gateway:</strong> ${gateway}</p>
+        </div>
+      </div>
+    `,
+  }),
 };
 
 module.exports = {

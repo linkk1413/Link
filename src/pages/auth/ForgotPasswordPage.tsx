@@ -33,17 +33,15 @@ const ForgotPasswordPage: React.FC = () => {
       await sendPasswordResetEmail(auth, email);
       setSuccess(t("auth.resetEmailSent"));
 
-      // Also send reset email via our backend (Resend)
+      // Also send reset email via our backend (Resend). The server builds
+      // the actual link itself — it will not accept one from us.
       try {
-        // Get the reset link from Firebase
-        const resetLink = `https://firebase.google.com/auth/reset-password?oobCode=`;
         await fetch("/api/auth/send-reset-email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email,
             name: email.split("@")[0],
-            resetLink: `${window.location.origin}/auth/reset-password`,
           }),
         });
       } catch (resendError) {

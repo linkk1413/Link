@@ -128,12 +128,10 @@ export async function finalizeMoyasarSubscription(params: {
 
   // 6. Notify admin (non-blocking).
   try {
-    await fetch(`${apiBaseUrl}/api/email/notify-admin-subscription`, {
+    await fetch(`${apiBaseUrl}/api/auth/notify-admin-subscription`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        providerName: draft.providerName,
-        providerEmail: draft.providerEmail,
         providerId: draft.uid,
         planName: draft.planName,
         planMonths: draft.planMonths,

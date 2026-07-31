@@ -5,6 +5,7 @@ const { defineSecret } = require("firebase-functions/params");
 const {
   onDocumentCreated,
   onDocumentUpdated,
+  onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onRequest } = require("firebase-functions/v2/https");
@@ -350,6 +351,41 @@ exports.onBookingStatusChanged = onDocumentUpdated(
         `,
       });
     }
+  },
+);
+
+// Recompute a provider's rating from real review documents whenever a review
+// is created, edited, or deleted. Runs with Admin SDK privileges so it's the
+// only path allowed to write providers/{id}.ratingAvg|ratingCount — clients
+// (including the provider themselves) are blocked from writing those fields
+// directly in firestore.rules, closing off fake/self-inflated ratings.
+exports.onReviewWritten = onDocumentWritten(
+  "reviews/{reviewId}",
+  async (event) => {
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
+    const providerId = after?.providerId || before?.providerId;
+    if (!providerId) return;
+
+    const snapshot = await db
+      .collection("reviews")
+      .where("providerId", "==", providerId)
+      .get();
+
+    const ratings = snapshot.docs
+      .map((doc) => Number(doc.data().rating))
+      .filter((r) => Number.isFinite(r));
+
+    const ratingCount = ratings.length;
+    const ratingAvg = ratingCount
+      ? Math.round((ratings.reduce((sum, r) => sum + r, 0) / ratingCount) * 10) / 10
+      : 0;
+
+    await db.collection("providers").doc(providerId).update({
+      ratingAvg,
+      ratingCount,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
   },
 );
 

@@ -1,5 +1,9 @@
 const express = require("express");
+const admin = require("../firebaseAdmin");
+const { requireAuth } = require("../middleware/auth");
+
 const router = express.Router();
+const db = admin.firestore();
 
 const MOYASAR_API_BASE = "https://api.moyasar.com/v1";
 
@@ -11,8 +15,48 @@ const getAuthHeader = () => {
   return `Basic ${Buffer.from(`${secretKey}:`).toString("base64")}`;
 };
 
+const getPaymentByOrderId = async (orderId) => {
+  const snapshot = await db
+    .collection("payments")
+    .where("orderId", "==", orderId)
+    .limit(1)
+    .get();
+  if (snapshot.empty) return null;
+  const docSnap = snapshot.docs[0];
+  return { id: docSnap.id, ref: docSnap.ref, ...docSnap.data() };
+};
+
+const isAdminUid = async (uid) => {
+  const snap = await db.collection("users").doc(uid).get();
+  if (!snap.exists) return false;
+  const data = snap.data();
+  return (data.activeRole || data.role) === "ADMIN";
+};
+
+// Loads the Firestore payment record for :id and ensures the caller is the
+// provider on that booking (or an admin) before letting a capture/void/refund
+// through. Without this, anyone who knew a Moyasar payment id could move
+// someone else's money by calling this API directly — the app UI is not the
+// only way to reach it.
+const requireOwnPayment = async (req, res, next) => {
+  try {
+    const payment = await getPaymentByOrderId(req.params.id);
+    if (!payment) {
+      return res.status(404).json({ error: "Payment not found" });
+    }
+    if (payment.providerId !== req.uid && !(await isAdminUid(req.uid))) {
+      return res.status(403).json({ error: "Not authorized for this payment" });
+    }
+    req.paymentRecord = payment;
+    next();
+  } catch (error) {
+    console.error("Payment ownership check failed:", error);
+    return res.status(500).json({ error: "Authorization check failed" });
+  }
+};
+
 // Create a payment
-router.post("/create-payment", async (req, res) => {
+router.post("/create-payment", requireAuth, async (req, res) => {
   try {
     const {
       amount,
@@ -129,10 +173,16 @@ router.post("/webhook", async (req, res) => {
 
 // Capture an authorized (manual/hold) payment — charges the held funds.
 // Called when the provider ACCEPTS the booking.
-router.post("/capture/:id", async (req, res) => {
+router.post("/capture/:id", requireAuth, requireOwnPayment, async (req, res) => {
   try {
     const { id } = req.params;
     const { amount } = req.body; // Optional partial capture amount in SAR
+
+    if (req.paymentRecord.status !== "AUTHORIZED") {
+      return res
+        .status(409)
+        .json({ error: "Payment is not in an authorized/held state" });
+    }
 
     const body = amount ? { amount: Math.round(Number(amount) * 100) } : {};
 
@@ -154,6 +204,10 @@ router.post("/capture/:id", async (req, res) => {
         .json({ error: data.message || "Capture failed" });
     }
 
+    // Written server-side with Admin SDK (bypasses firestore.rules) — the
+    // client is never trusted to report its own capture status.
+    await req.paymentRecord.ref.update({ status: "CAPTURED", captureId: data.id });
+
     res.json(data);
   } catch (error) {
     console.error("Moyasar capture error:", error);
@@ -163,9 +217,15 @@ router.post("/capture/:id", async (req, res) => {
 
 // Void an authorized (manual/hold) payment — releases the hold without charging.
 // Called when the provider REJECTS/cancels a still-authorized booking.
-router.post("/void/:id", async (req, res) => {
+router.post("/void/:id", requireAuth, requireOwnPayment, async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (req.paymentRecord.status !== "AUTHORIZED") {
+      return res
+        .status(409)
+        .json({ error: "Payment is not in an authorized/held state" });
+    }
 
     const response = await fetch(`${MOYASAR_API_BASE}/payments/${id}/void`, {
       method: "POST",
@@ -184,6 +244,8 @@ router.post("/void/:id", async (req, res) => {
         .json({ error: data.message || "Void failed" });
     }
 
+    await req.paymentRecord.ref.update({ status: "VOIDED" });
+
     res.json(data);
   } catch (error) {
     console.error("Moyasar void error:", error);
@@ -192,10 +254,14 @@ router.post("/void/:id", async (req, res) => {
 });
 
 // Refund a payment
-router.post("/refund/:id", async (req, res) => {
+router.post("/refund/:id", requireAuth, requireOwnPayment, async (req, res) => {
   try {
     const { id } = req.params;
     const { amount } = req.body; // Optional: partial refund amount in halalas
+
+    if (req.paymentRecord.status !== "CAPTURED") {
+      return res.status(409).json({ error: "Payment has not been captured" });
+    }
 
     const body = amount ? { amount: Math.round(Number(amount) * 100) } : {};
 
@@ -215,6 +281,8 @@ router.post("/refund/:id", async (req, res) => {
         .status(response.status)
         .json({ error: data.message || "Refund failed" });
     }
+
+    await req.paymentRecord.ref.update({ status: "REFUNDED" });
 
     res.json(data);
   } catch (error) {

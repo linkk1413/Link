@@ -5,6 +5,7 @@ const fetch = global.fetch || require("node-fetch");
 const Stripe = require("stripe");
 const emailRouter = require("./src/routes/email");
 const moyasarRouter = require("./src/routes/moyasar");
+const { rateLimit } = require("./src/middleware/rateLimit");
 
 const app = express();
 const PORT = process.env.PORT || 4242;
@@ -321,8 +322,14 @@ app.post("/stripe/create-payment-intent", async (req, res) => {
   }
 });
 
-// Email routes
-app.use("/api/auth", emailRouter);
+// Email routes — rate-limited since these send mail from the app's real
+// domain and are reachable without login (password reset must work while
+// logged out).
+app.use(
+  "/api/auth",
+  rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }),
+  emailRouter,
+);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`PayPal server running on port ${PORT}`);

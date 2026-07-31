@@ -11,6 +11,7 @@ import {
   Ban,
   CheckCircle,
   CreditCard,
+  UserCog,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +39,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useUsers, useUpdateUserStatus } from "@/hooks/queries/useUsers";
+import {
+  useUsers,
+  useUpdateUserStatus,
+  useUpdateUserRole,
+} from "@/hooks/queries/useUsers";
 import {
   usePaymentsByClient,
   usePaymentsByProvider,
@@ -65,10 +70,16 @@ const AdminUsersPage: React.FC = () => {
   }>({ open: false, action: null });
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [detailsUser, setDetailsUser] = useState<UserType | null>(null);
+  const [roleDialog, setRoleDialog] = useState<{
+    open: boolean;
+    user: UserType | null;
+    newRole: UserRole;
+  }>({ open: false, user: null, newRole: "CLIENT" });
 
   // Fetch users
   const { data: users = [], isLoading } = useUsers();
   const updateStatusMutation = useUpdateUserStatus();
+  const updateRoleMutation = useUpdateUserRole();
   const detailsUserId = detailsUser?.uid || "";
   const { data: providerProfile } = useProviderProfile(detailsUserId);
   const { data: providerPayments = [] } = usePaymentsByProvider(detailsUserId);
@@ -132,6 +143,24 @@ const AdminUsersPage: React.FC = () => {
   const handleAction = (user: UserType, action: "suspend" | "activate") => {
     setSelectedUser(user);
     setActionDialog({ open: true, action });
+  };
+
+  const openRoleDialog = (user: UserType) => {
+    const currentRole = user.role || user.roles?.[0] || "CLIENT";
+    setRoleDialog({ open: true, user, newRole: currentRole });
+  };
+
+  const confirmRoleChange = async () => {
+    if (!roleDialog.user) return;
+    try {
+      await updateRoleMutation.mutateAsync({
+        userId: roleDialog.user.uid,
+        role: roleDialog.newRole,
+      });
+      setRoleDialog({ open: false, user: null, newRole: "CLIENT" });
+    } catch (error) {
+      console.error("Failed to update user role:", error);
+    }
   };
 
   const openUserDetails = (user: UserType) => {
@@ -414,6 +443,15 @@ const AdminUsersPage: React.FC = () => {
                         {t("admin.viewProviderPayments")}
                       </DropdownMenuItem>
                     )}
+                    <DropdownMenuItem
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openRoleDialog(user);
+                      }}
+                    >
+                      <UserCog className="me-2 h-4 w-4" />
+                      {t("admin.changeRole")}
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -745,6 +783,54 @@ const AdminUsersPage: React.FC = () => {
               onClick={() => setDetailsDialogOpen(false)}
             >
               {t("common.close")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Role Dialog */}
+      <Dialog
+        open={roleDialog.open}
+        onOpenChange={(open) =>
+          setRoleDialog({ open, user: open ? roleDialog.user : null, newRole: roleDialog.newRole })
+        }
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("admin.changeRoleTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("admin.changeRoleDescription", { name: roleDialog.user?.name })}
+            </DialogDescription>
+          </DialogHeader>
+          <Select
+            value={roleDialog.newRole}
+            onValueChange={(value) =>
+              setRoleDialog((prev) => ({ ...prev, newRole: value as UserRole }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="CLIENT">{t("roles.client")}</SelectItem>
+              <SelectItem value="PROVIDER">{t("roles.provider")}</SelectItem>
+              <SelectItem value="ADMIN">{t("roles.admin")}</SelectItem>
+            </SelectContent>
+          </Select>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() =>
+                setRoleDialog({ open: false, user: null, newRole: "CLIENT" })
+              }
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={confirmRoleChange}
+              disabled={updateRoleMutation.isPending}
+            >
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>

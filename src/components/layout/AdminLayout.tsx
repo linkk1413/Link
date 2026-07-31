@@ -12,6 +12,9 @@ import {
   LogOut,
   Menu,
   X,
+  Settings,
+  MessageSquare,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -23,6 +26,16 @@ const adminNavItems = [
     path: "/admin",
     labelKey: "admin.nav.dashboard",
     icon: <LayoutDashboard className="h-5 w-5" />,
+  },
+  {
+    path: "/admin/chats",
+    labelKey: "admin.nav.chats",
+    icon: <MessageSquare className="h-5 w-5" />,
+  },
+  {
+    path: "/admin/orders",
+    labelKey: "admin.nav.orders",
+    icon: <ClipboardList className="h-5 w-5" />,
   },
   {
     path: "/admin/users",
@@ -53,6 +66,11 @@ const adminNavItems = [
     path: "/admin/reviews",
     labelKey: "admin.nav.reviews",
     icon: <Star className="h-5 w-5" />,
+  },
+  {
+    path: "/admin/settings",
+    labelKey: "admin.nav.settings",
+    icon: <Settings className="h-5 w-5" />,
   },
 ];
 

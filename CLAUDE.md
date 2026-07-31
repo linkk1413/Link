@@ -78,6 +78,13 @@ Two distinct verification concepts on `ProviderProfile`, easily confused: `ident
 
 ## Known stale / dead code
 
-- [.github/copilot-instructions.md](.github/copilot-instructions.md) is **out of date**: its "Implementation Tasks" list marks Firebase auth, Firestore, React Query, chat, payouts, etc. as 🔴 Not Started — all of them are built. Trust the code, not that file.
-- [src/pages/placeholders.tsx](src/pages/placeholders.tsx) is unused; every page it stubs now exists.
-- [ProviderSchedulePage](src/pages/provider/ProviderSchedulePage.tsx) keeps weekly availability in local React state only — it is never persisted to Firestore, so the `AvailabilityRule` / `AvailabilityException` types are defined but unwritten. Booking time slots do not currently consult real availability.
+- [ProviderSchedulePage](src/pages/provider/ProviderSchedulePage.tsx)'s weekly hours now persist to `providers/{uid}.availabilityRules` (see `useUpdateProviderProfile`). `AvailabilityException` (one-off date overrides) is still defined but unwritten — the page has no UI for it yet. Booking time slots in [BookingPage](src/pages/client/BookingPage.tsx) still do not consult either; that's a separate, bigger change (slot generation would need to intersect requested time against `availabilityRules`/`availabilityExceptions`).
+
+## Security notes (2026-07-31 hardening pass)
+
+- `providers/{id}.ratingAvg` / `ratingCount` are computed by the `onReviewWritten` Cloud Function ([functions/index.js](functions/index.js)) from real `reviews` docs — firestore.rules blocks clients (including the provider) from writing those fields directly. Don't reintroduce a client-side write path for them.
+- `users/{uid}` create/update rules block a user from ever setting their own `roles`/`activeRole`/`role` to `ADMIN` (see `noSelfAdminEscalation()` in [firestore.rules](firestore.rules)). Only an existing admin can grant ADMIN.
+- `payments/{id}.status`/`captureId` are admin-only in firestore.rules; the real writes happen server-side (Admin SDK) inside the capture/void/refund handlers in [server/src/routes/moyasar.js](server/src/routes/moyasar.js), right after the real Moyasar call succeeds — never trust a client-reported capture/void/refund status.
+- Those same capture/void/refund endpoints require a verified Firebase ID token (`Authorization: Bearer <token>`, see [server/src/middleware/auth.js](server/src/middleware/auth.js)) and check the caller is the provider on that payment (or admin) before doing anything — they used to be reachable with zero auth.
+- The `server` Cloud Run service now needs `firebase-admin` to actually reach Firestore/Auth: its runtime service account must have Firestore read/write and Firebase Auth token-verification permissions (e.g. `roles/datastore.user` + `roles/firebaseauth.viewer`), not just the payment-gateway secrets it already had.
+- `/api/auth/send-reset-email` and `/send-verification-email` build the redirect link server-side from `CLIENT_APP_URL` — they no longer accept a link from the request body (that was an open phishing vector: send an "official" email to any address with an attacker-chosen link). `/send-booking-confirmation` and `/send-payment-confirmation` now take a `bookingId`/`paymentId` and look up the real recipient/content via Admin SDK instead of trusting the body.

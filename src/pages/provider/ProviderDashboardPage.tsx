@@ -36,14 +36,14 @@ import {
   useUpdateBookingStatus,
 } from "@/hooks/queries/useBookings";
 import { useProviderBanner } from "@/hooks/queries/useBanner";
-import { getPaymentByBooking, updatePayment } from "@/lib/firestore";
+import { getPaymentByBooking } from "@/lib/firestore";
 import { toast } from "@/components/ui/sonner";
 import logo from "@/assets/logo.jpeg";
 import { Booking } from "@/types";
 
 const ProviderDashboardPage: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const { user, logout } = useAuth();
+  const { user, firebaseUser, logout } = useAuth();
   const subscriptionStatus = useSubscriptionStatus();
   const { isLocked, isTrial, trialDaysRemaining, isExpired, profile } =
     subscriptionStatus;
@@ -112,23 +112,27 @@ const ProviderDashboardPage: React.FC = () => {
       const isHold = isMoyasar && payment?.status === "AUTHORIZED";
       const isCaptured = isMoyasar && payment?.status === "CAPTURED";
 
+      // The server verifies this token identifies the provider on the
+      // payment before it will capture/void/refund anything.
+      const idToken = await firebaseUser?.getIdToken();
+      const authHeaders: HeadersInit = idToken
+        ? { Authorization: `Bearer ${idToken}` }
+        : {};
+
       if (actionType === "accept") {
         // Immediate-capture payments are already charged — nothing to do.
         // If holds are ever enabled, capture the funds FIRST and only confirm
-        // the booking if it succeeds.
+        // the booking if it succeeds. The server records status/captureId
+        // itself after the real Moyasar capture succeeds.
         if (isHold && payment) {
           const res = await fetch(
             `${apiBaseUrl}/moyasar/capture/${payment.orderId}`,
-            { method: "POST" },
+            { method: "POST", headers: authHeaders },
           );
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
             throw new Error(data.error || "Failed to charge the client");
           }
-          await updatePayment(payment.id, {
-            status: "CAPTURED",
-            captureId: payment.orderId,
-          });
         }
         await updateStatusMutation.mutateAsync({
           id: selectedBooking.id,
@@ -136,22 +140,20 @@ const ProviderDashboardPage: React.FC = () => {
         });
       } else {
         // Reject: return the client's money, then mark the booking rejected.
-        // Captured payments are refunded; a still-held payment is voided.
+        // Captured payments are refunded; a still-held payment is voided. The
+        // server records the resulting status itself.
         await updateStatusMutation.mutateAsync({
           id: selectedBooking.id,
           status: "REJECTED",
         });
         if ((isCaptured || isHold) && payment) {
           const endpoint = isCaptured ? "refund" : "void";
-          const nextStatus = isCaptured ? "REFUNDED" : "VOIDED";
           try {
             const res = await fetch(
               `${apiBaseUrl}/moyasar/${endpoint}/${payment.orderId}`,
-              { method: "POST" },
+              { method: "POST", headers: authHeaders },
             );
-            if (res.ok) {
-              await updatePayment(payment.id, { status: nextStatus });
-            } else {
+            if (!res.ok) {
               console.error(`Moyasar ${endpoint} failed`, await res.text());
               toast.error(t("common.error"), {
                 description: t("payment.paymentFailed"),

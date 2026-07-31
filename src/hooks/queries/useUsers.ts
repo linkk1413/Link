@@ -10,7 +10,7 @@ import {
   orderBy,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { User, UserStatus } from "@/types";
+import { User, UserRole, UserStatus } from "@/types";
 
 // Query keys
 export const userKeys = {
@@ -157,6 +157,29 @@ export const useUpdateUserStatus = () => {
       // Update real Firestore document
       const userRef = doc(db, "users", userId);
       await updateDoc(userRef, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.all });
+    },
+  });
+};
+
+// Change a user's role (admin-only action — firestore.rules blocks a user
+// from ever granting themselves ADMIN, but an existing admin may set anyone
+// else's role here).
+export const useUpdateUserRole = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      userId,
+      role,
+    }: {
+      userId: string;
+      role: UserRole;
+    }) => {
+      const userRef = doc(db, "users", userId);
+      await updateDoc(userRef, { role, activeRole: role, roles: [role] });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.all });

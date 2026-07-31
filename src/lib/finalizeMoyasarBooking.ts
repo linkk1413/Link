@@ -141,28 +141,14 @@ export async function finalizeMoyasarBooking(params: {
     providerAmount: draft.priceTotal,
   });
 
-  // 5. Booking confirmation email (non-blocking).
+  // 5. Booking confirmation email (non-blocking). The server looks up the
+  // real booking/client/service records itself from bookingId — it no
+  // longer trusts recipient/content fields from the client.
   try {
-    const start = new Date(draft.startAt);
-    const dateStr = start.toLocaleDateString(
-      draft.lang === "ar" ? "ar-SA" : "en-US",
-      { weekday: "long", year: "numeric", month: "long", day: "numeric" },
-    );
-    const timeStr = start.toLocaleTimeString(
-      draft.lang === "ar" ? "ar-SA" : "en-US",
-      { hour: "2-digit", minute: "2-digit" },
-    );
     await fetch(`${apiBaseUrl}/api/auth/send-booking-confirmation`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        clientEmail: draft.clientEmail,
-        clientName: draft.clientName,
-        providerName: draft.providerName,
-        serviceName: draft.serviceName,
-        date: dateStr,
-        time: timeStr,
-      }),
+      body: JSON.stringify({ bookingId, lang: draft.lang }),
     });
   } catch (emailError) {
     console.error("Failed to send booking confirmation email:", emailError);

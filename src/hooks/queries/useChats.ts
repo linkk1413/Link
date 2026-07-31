@@ -8,6 +8,7 @@ import {
   onSnapshot,
   addDoc,
   updateDoc,
+  deleteDoc,
   doc,
   serverTimestamp,
   getDocs,
@@ -16,6 +17,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Chat, Message } from "@/types";
+import { detectContactInfo } from "@/lib/contactInfoFilter";
 import { useEffect, useState } from "react";
 
 // Helper to fetch provider name
@@ -217,12 +219,16 @@ export const useSendMessage = () => {
       imageUrl?: string;
     }) => {
       const messagesRef = collection(db, "chats", chatId, "messages");
+      const contactMatch = text ? detectContactInfo(text) : null;
       const message = {
         senderId,
         text: text || "",
         type: imageUrl ? "IMAGE" : "TEXT",
         imageUrl: imageUrl || null,
         createdAt: serverTimestamp(),
+        ...(contactMatch
+          ? { flaggedContactInfo: true, flaggedMatch: contactMatch }
+          : {}),
       };
 
       // Add the message
@@ -298,6 +304,56 @@ export const useCreateChat = () => {
       });
       queryClient.invalidateQueries({
         queryKey: chatKeys.byProvider(variables.providerId),
+      });
+    },
+  });
+};
+
+// Admin: every chat in the platform (firestore.rules grants isAdmin() a
+// blanket read on /chats, no query filter needed).
+export const useAllChats = () => {
+  return useQuery<Chat[], Error>({
+    queryKey: chatKeys.all,
+    queryFn: async () => {
+      const snapshot = await getDocs(collection(db, "chats"));
+      const chats = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          createdAt: convertTimestamp(data.createdAt),
+          lastMessageAt: data.lastMessageAt
+            ? convertTimestamp(data.lastMessageAt)
+            : undefined,
+        } as Chat;
+      });
+      return chats.sort((a, b) => {
+        const aTime = a.lastMessageAt?.getTime() || a.createdAt.getTime();
+        const bTime = b.lastMessageAt?.getTime() || b.createdAt.getTime();
+        return bTime - aTime;
+      });
+    },
+  });
+};
+
+// Admin: delete a single message (moderation). firestore.rules only allows
+// this for isAdmin().
+export const useDeleteMessage = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      chatId,
+      messageId,
+    }: {
+      chatId: string;
+      messageId: string;
+    }) => {
+      await deleteDoc(doc(db, "chats", chatId, "messages", messageId));
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.messages(variables.chatId),
       });
     },
   });

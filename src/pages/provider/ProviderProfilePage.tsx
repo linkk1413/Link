@@ -58,7 +58,8 @@ import {
   doc,
   updateDoc,
 } from "firebase/firestore";
-import { db, auth } from "@/lib/firebase";
+import { db, auth, storage } from "@/lib/firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { sendEmailVerification } from "firebase/auth";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { SupportContactCard } from "@/components/SupportContactCard";
@@ -66,6 +67,10 @@ import {
   useProviderProfile,
   useUpdateProviderProfile,
 } from "@/hooks/queries/useProviders";
+import {
+  useProviderVerification,
+  useSubmitVerification,
+} from "@/hooks/queries/useVerifications";
 import { SAUDI_REGIONS } from "@/lib/saudiLocations";
 
 // Mock data for wallet - would come from Firestore
@@ -134,6 +139,47 @@ const ProviderProfilePage: React.FC = () => {
   // Trusted Provider badge (earned after 10 completed bookings)
   const isTrustedProvider = providerProfile?.isVerified || false;
   const progressToTrusted = Math.min(completedBookingsCount, 10);
+
+  // Identity verification (admin-approved, required to publish services)
+  const { data: verificationRequest } = useProviderVerification(
+    user?.uid || "",
+  );
+  const submitVerificationMutation = useSubmitVerification();
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+  const [verificationFiles, setVerificationFiles] = useState<File[]>([]);
+  const [isUploadingDocs, setIsUploadingDocs] = useState(false);
+
+  const handleSubmitVerification = async () => {
+    if (!user || verificationFiles.length === 0) return;
+    setIsUploadingDocs(true);
+    try {
+      const documents = await Promise.all(
+        verificationFiles.map(async (file) => {
+          const path = `verifications/${user.uid}/${Date.now()}-${file.name}`;
+          const fileRef = storageRef(storage, path);
+          await uploadBytes(fileRef, file);
+          const url = await getDownloadURL(fileRef);
+          return { name: file.name, url };
+        }),
+      );
+
+      await submitVerificationMutation.mutateAsync({
+        providerId: user.uid,
+        providerName: providerProfile?.displayName || user.name || "",
+        providerEmail: user.email || "",
+        documents,
+      });
+
+      toast.success(t("profile.verificationSubmitted"));
+      setVerifyDialogOpen(false);
+      setVerificationFiles([]);
+    } catch (error) {
+      console.error("Failed to submit verification:", error);
+      toast.error(t("common.error"));
+    } finally {
+      setIsUploadingDocs(false);
+    }
+  };
 
   const handleResendVerificationEmail = async () => {
     if (!firebaseUser || isSendingVerification) return;
@@ -785,6 +831,40 @@ const ProviderProfilePage: React.FC = () => {
                   )}
                 </div>
 
+                {/* Identity Verification (required to publish services) */}
+                <div className="flex items-center justify-between p-4 border-b">
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                    <span>{t("profile.identityVerification")}</span>
+                  </div>
+                  {providerProfile?.identityVerified ? (
+                    <Badge className="bg-green-500">
+                      {t("profile.verified")}
+                    </Badge>
+                  ) : verificationRequest?.status === "PENDING" ? (
+                    <Badge variant="secondary">
+                      {t("admin.pending")}
+                    </Badge>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setVerifyDialogOpen(true)}
+                    >
+                      {verificationRequest?.status === "REJECTED"
+                        ? t("profile.resubmitVerification")
+                        : t("profile.verifyIdentity")}
+                    </Button>
+                  )}
+                </div>
+                {verificationRequest?.status === "REJECTED" &&
+                  !providerProfile?.identityVerified && (
+                    <div className="border-b bg-destructive/10 px-4 py-2 text-xs text-destructive">
+                      {verificationRequest.reason ||
+                        t("profile.verificationRejectedGeneric")}
+                    </div>
+                  )}
+
                 {/* Trusted Provider Badge */}
                 <div className="flex items-center justify-between p-4 border-b">
                   <div className="flex items-center gap-3">
@@ -1043,6 +1123,58 @@ const ProviderProfilePage: React.FC = () => {
               }
             >
               {isLoading ? t("common.loading") : t("wallet.requestPayout")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Identity Verification Dialog */}
+      <Dialog
+        open={verifyDialogOpen}
+        onOpenChange={(open) => {
+          setVerifyDialogOpen(open);
+          if (!open) setVerificationFiles([]);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("profile.verifyIdentity")}</DialogTitle>
+            <DialogDescription>
+              {t("profile.verifyIdentityHint")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Input
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              onChange={(e) =>
+                setVerificationFiles(Array.from(e.target.files || []))
+              }
+            />
+            {verificationFiles.length > 0 && (
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                {verificationFiles.map((file) => (
+                  <li key={file.name}>{file.name}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setVerifyDialogOpen(false)}
+              disabled={isUploadingDocs}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={handleSubmitVerification}
+              disabled={verificationFiles.length === 0 || isUploadingDocs}
+            >
+              {isUploadingDocs
+                ? t("common.uploading")
+                : t("profile.submitVerification")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -34,9 +34,10 @@ import {
 } from "@/components/ui/dialog";
 import { useUsers } from "@/hooks/queries/useUsers";
 import { useUpdateProviderProfile } from "@/hooks/queries/useProviders";
+import { useSubscriptionSettings } from "@/hooks/queries/useSubscriptionSettings";
 import { ProviderProfile } from "@/types";
 import {
-  getProviderProfile,
+  getProvidersByIds,
   verifySubscriptionPayment,
   updateSubscriptionStatus,
   grantTrialToProvider,
@@ -96,6 +97,15 @@ const AdminSubscriptionsPage: React.FC = () => {
 
   const { data: users = [], isLoading } = useUsers();
   const updateProviderMutation = useUpdateProviderProfile();
+  const { data: subscriptionSettings } = useSubscriptionSettings();
+
+  // Finds how many months a plan covers by matching its configured price —
+  // falls back to 1 month if the provider's price doesn't match any plan
+  // (e.g. a legacy/custom price).
+  const monthsForPrice = (price: number | undefined): number => {
+    const plan = subscriptionSettings?.plans?.find((p) => p.price === price);
+    return plan?.months || 1;
+  };
 
   // Get all providers - check both roles array and legacy role field
   const providers = useMemo(() => {
@@ -113,17 +123,11 @@ const AdminSubscriptionsPage: React.FC = () => {
     const fetchProfiles = async () => {
       setIsLoadingProfiles(true);
       try {
+        const profileList = await getProvidersByIds(
+          providers.map((p) => p.uid),
+        );
         const profiles = new Map<string, ProviderProfile>();
-        for (const provider of providers) {
-          try {
-            const profileData = await getProviderProfile(provider.uid);
-            if (profileData) {
-              profiles.set(provider.uid, profileData);
-            }
-          } catch (error) {
-            console.warn(`Failed to fetch profile for ${provider.uid}:`, error);
-          }
-        }
+        profileList.forEach((profile) => profiles.set(profile.uid, profile));
         setProviderProfiles(profiles);
       } finally {
         setIsLoadingProfiles(false);
@@ -247,12 +251,7 @@ const AdminSubscriptionsPage: React.FC = () => {
       const existing = updated.get(provider.uid);
       if (existing) {
         const endDate = new Date(date);
-        const months =
-          existing.subscriptionPrice === 27
-            ? 3
-            : existing.subscriptionPrice === 96
-              ? 12
-              : 1;
+        const months = monthsForPrice(existing.subscriptionPrice);
         endDate.setMonth(endDate.getMonth() + months);
 
         updated.set(provider.uid, {

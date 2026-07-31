@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
@@ -31,8 +31,41 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 import { useProviderBookings } from "@/hooks/queries/useBookings";
+import {
+  useProviderProfile,
+  useUpdateProviderProfile,
+} from "@/hooks/queries/useProviders";
 import { toast } from "@/components/ui/sonner";
 import { AvailabilityRule } from "@/types";
+
+const DEFAULT_WEEKLY_SCHEDULE: Record<number, AvailabilityRule | null> = {
+  0: null, // Sunday - off
+  1: { id: "1", dayOfWeek: 1, startTime: "09:00", endTime: "17:00" },
+  2: { id: "2", dayOfWeek: 2, startTime: "09:00", endTime: "17:00" },
+  3: { id: "3", dayOfWeek: 3, startTime: "09:00", endTime: "17:00" },
+  4: { id: "4", dayOfWeek: 4, startTime: "09:00", endTime: "17:00" },
+  5: { id: "5", dayOfWeek: 5, startTime: "09:00", endTime: "17:00" },
+  6: null, // Saturday - off
+};
+
+const rulesToWeeklySchedule = (
+  rules: AvailabilityRule[] | undefined,
+): Record<number, AvailabilityRule | null> => {
+  if (!rules || rules.length === 0) return DEFAULT_WEEKLY_SCHEDULE;
+  const byDay: Record<number, AvailabilityRule | null> = {
+    0: null,
+    1: null,
+    2: null,
+    3: null,
+    4: null,
+    5: null,
+    6: null,
+  };
+  rules.forEach((rule) => {
+    byDay[rule.dayOfWeek] = rule;
+  });
+  return byDay;
+};
 
 // Days of the week
 const DAYS = [
@@ -63,18 +96,21 @@ const ProviderSchedulePage: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
 
-  // Weekly availability rules (local state - would be stored in Firestore)
+  // Weekly availability rules — persisted on providers/{uid}.availabilityRules.
+  const { data: providerProfile } = useProviderProfile(user?.uid || "");
+  const updateProfileMutation = useUpdateProviderProfile();
   const [weeklySchedule, setWeeklySchedule] = useState<
     Record<number, AvailabilityRule | null>
-  >({
-    0: null, // Sunday - off
-    1: { id: "1", dayOfWeek: 1, startTime: "09:00", endTime: "17:00" },
-    2: { id: "2", dayOfWeek: 2, startTime: "09:00", endTime: "17:00" },
-    3: { id: "3", dayOfWeek: 3, startTime: "09:00", endTime: "17:00" },
-    4: { id: "4", dayOfWeek: 4, startTime: "09:00", endTime: "17:00" },
-    5: { id: "5", dayOfWeek: 5, startTime: "09:00", endTime: "17:00" },
-    6: null, // Saturday - off
-  });
+  >(DEFAULT_WEEKLY_SCHEDULE);
+
+  // Hydrate from Firestore once the provider's saved schedule loads. Only
+  // runs once per profile fetch so it doesn't clobber in-progress edits.
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (!providerProfile || hydratedRef.current) return;
+    hydratedRef.current = true;
+    setWeeklySchedule(rulesToWeeklySchedule(providerProfile.availabilityRules));
+  }, [providerProfile]);
 
   // Editing day
   const [editingDay, setEditingDay] = useState<number | null>(null);
@@ -145,28 +181,38 @@ const ProviderSchedulePage: React.FC = () => {
     setScheduleDialogOpen(true);
   };
 
-  const saveDaySchedule = () => {
-    if (editingDay === null) return;
+  const saveDaySchedule = async () => {
+    if (editingDay === null || !user) return;
 
-    if (editForm.enabled) {
-      setWeeklySchedule({
-        ...weeklySchedule,
-        [editingDay]: {
-          id: editingDay.toString(),
-          dayOfWeek: editingDay,
-          startTime: editForm.startTime,
-          endTime: editForm.endTime,
-        },
-      });
-    } else {
-      setWeeklySchedule({
-        ...weeklySchedule,
-        [editingDay]: null,
-      });
-    }
+    const nextSchedule: Record<number, AvailabilityRule | null> = {
+      ...weeklySchedule,
+      [editingDay]: editForm.enabled
+        ? {
+            id: editingDay.toString(),
+            dayOfWeek: editingDay,
+            startTime: editForm.startTime,
+            endTime: editForm.endTime,
+          }
+        : null,
+    };
 
+    setWeeklySchedule(nextSchedule);
     setScheduleDialogOpen(false);
     setEditingDay(null);
+
+    const availabilityRules = Object.values(nextSchedule).filter(
+      (rule): rule is AvailabilityRule => rule !== null,
+    );
+
+    try {
+      await updateProfileMutation.mutateAsync({
+        uid: user.uid,
+        updates: { availabilityRules },
+      });
+    } catch (error) {
+      console.error("Failed to save schedule:", error);
+      toast.error(t("common.error"));
+    }
   };
 
   const isToday = (date: Date) => {

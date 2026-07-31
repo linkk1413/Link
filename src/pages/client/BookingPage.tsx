@@ -247,37 +247,14 @@ const BookingPage: React.FC = () => {
         providerAmount: service.price,
       });
 
-      // Send booking confirmation email
+      // Send booking confirmation email. The server looks up the real
+      // booking/client/service records itself from bookingId.
       try {
-        const dateStr = startAt.toLocaleDateString(
-          i18n.language === "ar" ? "ar-SA" : "en-US",
-          {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          },
-        );
-        const timeStr = startAt.toLocaleTimeString(
-          i18n.language === "ar" ? "ar-SA" : "en-US",
-          {
-            hour: "2-digit",
-            minute: "2-digit",
-          },
-        );
-
         const apiBaseUrl = import.meta.env.VITE_PAYPAL_API_BASE_URL || "";
         await fetch(`${apiBaseUrl}/api/auth/send-booking-confirmation`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clientEmail: user.email,
-            clientName: user.displayName || user.email.split("@")[0],
-            providerName: provider?.name || "Provider",
-            serviceName: service.title,
-            date: dateStr,
-            time: timeStr,
-          }),
+          body: JSON.stringify({ bookingId, lang: i18n.language }),
         });
       } catch (emailError) {
         // Non-blocking: Email failure doesn't prevent booking

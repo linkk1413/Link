@@ -54,6 +54,7 @@ export const COLLECTIONS = {
   SETTINGS: "settings",
   REPORTS: "reports",
   BLOCKED_USERS: "blockedUsers",
+  VERIFICATIONS: "verifications",
 } as const;
 
 // Convert Firestore timestamp to Date
@@ -906,6 +907,63 @@ export const updateProviderProfile = async (
   });
 };
 
+// ============================================
+// PROVIDER IDENTITY VERIFICATION
+// ============================================
+
+export interface VerificationRequest {
+  id: string;
+  providerId: string;
+  providerName: string;
+  providerEmail: string;
+  documents: { name: string; url: string }[];
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  submittedAt: Date;
+  reason?: string;
+}
+
+// Provider submits (or re-submits after a rejection) their ID documents.
+export const submitVerificationRequest = async (
+  providerId: string,
+  providerName: string,
+  providerEmail: string,
+  documents: { name: string; url: string }[],
+): Promise<string> => {
+  const verificationsRef = collection(db, COLLECTIONS.VERIFICATIONS);
+  const docRef = await addDoc(verificationsRef, {
+    providerId,
+    providerName,
+    providerEmail,
+    documents,
+    status: "PENDING",
+    submittedAt: serverTimestamp(),
+  });
+  return docRef.id;
+};
+
+// The provider's most recent verification request, if any. Sorted
+// client-side (no orderBy) so this doesn't need a composite index.
+export const getLatestVerificationForProvider = async (
+  providerId: string,
+): Promise<VerificationRequest | null> => {
+  const verificationsRef = collection(db, COLLECTIONS.VERIFICATIONS);
+  const q = query(verificationsRef, where("providerId", "==", providerId));
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+
+  const requests = snapshot.docs.map((docSnap) => {
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      ...data,
+      submittedAt: data.submittedAt?.toDate?.() || new Date(0),
+    } as VerificationRequest;
+  });
+
+  requests.sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime());
+  return requests[0];
+};
+
 // Verify subscription payment (admin marks as paid)
 export const verifySubscriptionPayment = async (
   providerId: string,
@@ -1742,38 +1800,10 @@ export const getReviewById = async (
   };
 };
 
-// Helper function to recalculate and update provider rating
-const updateProviderRating = async (providerId: string): Promise<void> => {
-  // Simple query without orderBy to avoid index requirement
-  const reviewsRef = collection(db, COLLECTIONS.REVIEWS);
-  const q = query(reviewsRef, where("providerId", "==", providerId));
-  const snapshot = await getDocs(q);
-
-  if (snapshot.empty) {
-    // No reviews, reset rating
-    const providerRef = doc(db, COLLECTIONS.PROVIDERS, providerId);
-    await updateDoc(providerRef, {
-      ratingAvg: 0,
-      ratingCount: 0,
-      updatedAt: serverTimestamp(),
-    });
-    return;
-  }
-
-  let totalRating = 0;
-  snapshot.docs.forEach((doc) => {
-    const data = doc.data();
-    totalRating += data.rating || 0;
-  });
-  const ratingAvg = totalRating / snapshot.docs.length;
-
-  const providerRef = doc(db, COLLECTIONS.PROVIDERS, providerId);
-  await updateDoc(providerRef, {
-    ratingAvg: Math.round(ratingAvg * 10) / 10, // Round to 1 decimal
-    ratingCount: snapshot.docs.length,
-    updatedAt: serverTimestamp(),
-  });
-};
+// Provider ratingAvg/ratingCount are recomputed server-side by the
+// onReviewWritten Cloud Function (Admin SDK) whenever a review changes —
+// firestore.rules blocks clients (including the provider) from writing those
+// fields directly, so there is no client-side recompute step here anymore.
 
 // Create a new review and update provider rating
 export const createReview = async (
@@ -1783,44 +1813,32 @@ export const createReview = async (
   // For booking-based reviews, check by bookingId
   // For open reviews (no booking), check by client+provider
   let existingReview: Review | null = null;
-  
+
   if (review.bookingId) {
     existingReview = await getReviewByBooking(review.bookingId);
   } else {
     // Open review - check if client already reviewed this provider
     existingReview = await getReviewByClientAndProvider(review.clientId, review.providerId);
   }
-  
+
   if (existingReview) {
     // Review exists - return the existing ID instead of throwing
-    // This handles the case where review was created but rating update failed
-    try {
-      await updateProviderRating(review.providerId);
-    } catch (e) {
-      console.error("Failed to update provider rating:", e);
-    }
     return existingReview.id;
   }
 
   const reviewsRef = collection(db, COLLECTIONS.REVIEWS);
-  
+
   // Filter out undefined values - Firestore doesn't accept undefined
   const reviewData = Object.fromEntries(
     Object.entries(review).filter(([, value]) => value !== undefined)
   );
-  
+
   const docRef = await addDoc(reviewsRef, {
     ...reviewData,
     createdAt: serverTimestamp(),
   });
 
-  // Update provider's rating (don't fail the whole operation if this fails)
-  try {
-    await updateProviderRating(review.providerId);
-  } catch (e) {
-    console.error("Failed to update provider rating:", e);
-  }
-
+  // Provider rating is recomputed by the onReviewWritten Cloud Function.
   return docRef.id;
 };
 
@@ -1841,14 +1859,10 @@ export const updateReview = async (
     updatedAt: serverTimestamp(),
   });
 
-  // Update provider's rating if rating changed
-  if (updates.rating !== undefined) {
-    const reviewData = reviewSnap.data() as FirestoreReview;
-    await updateProviderRating(reviewData.providerId);
-  }
+  // Provider rating is recomputed by the onReviewWritten Cloud Function.
 };
 
-// Delete a review and update provider rating
+// Delete a review
 export const deleteReview = async (reviewId: string): Promise<void> => {
   const reviewRef = doc(db, COLLECTIONS.REVIEWS, reviewId);
   const reviewSnap = await getDoc(reviewRef);
@@ -1857,13 +1871,9 @@ export const deleteReview = async (reviewId: string): Promise<void> => {
     throw new Error("Review not found");
   }
 
-  const reviewData = reviewSnap.data() as FirestoreReview;
-  const providerId = reviewData.providerId;
-
   await deleteDoc(reviewRef);
 
-  // Update provider's rating after deletion
-  await updateProviderRating(providerId);
+  // Provider rating is recomputed by the onReviewWritten Cloud Function.
 };
 
 /**

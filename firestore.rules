@@ -40,25 +40,38 @@ service cloud.firestore {
       return role() == "CLIENT";
     }
 
+    // A user editing their own doc can never grant themselves ADMIN. Only an
+    // existing admin (via the isAdmin() branch on the rule itself) may do that.
+    function noSelfAdminEscalation() {
+      let d = request.resource.data;
+      return !('ADMIN' in d.get('roles', []))
+        && d.get('activeRole', '') != 'ADMIN'
+        && d.get('role', '') != 'ADMIN';
+    }
+
     match /users/{userId} {
       // Allow get for own document or admin
       allow get: if signedIn() && (userId == request.auth.uid || isAdmin());
-      // Allow list/query for authenticated users (needed for phone uniqueness check)
-      allow list: if signedIn();
-      allow create: if signedIn() && userId == request.auth.uid;
-      allow update: if signedIn() && (userId == request.auth.uid || isAdmin());
+      // Admins get the full list (needed by the admin users panel). Everyone
+      // else is capped to limit(1) — enough for the phone-uniqueness check,
+      // not enough to dump the collection.
+      allow list: if isAdmin() || (signedIn() && request.query.limit <= 1);
+      allow create: if signedIn() && userId == request.auth.uid && noSelfAdminEscalation();
+      allow update: if isAdmin() || (
+        signedIn() && userId == request.auth.uid && noSelfAdminEscalation()
+      );
       allow delete: if isAdmin();
     }
 
     match /providers/{providerId} {
       allow read: if true;
       allow create: if signedIn() && (providerId == request.auth.uid || isAdmin());
-      // Allow update by owner/admin, OR by any authenticated user for rating fields only
-      allow update: if signedIn() && (
-        providerId == request.auth.uid || 
-        isAdmin() ||
-        // Allow rating update by any authenticated user (for review system)
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingAvg', 'ratingCount', 'updatedAt']))
+      // Owner/admin may update their profile, but ratingAvg/ratingCount are
+      // computed server-side (see functions/onReviewWritten) from real reviews —
+      // not even the owner may write them directly.
+      allow update: if isAdmin() || (
+        signedIn() && providerId == request.auth.uid &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ratingAvg', 'ratingCount'])
       );
       allow delete: if isAdmin();
     }
@@ -108,14 +121,12 @@ service cloud.firestore {
         && bookingDoc(request.resource.data.bookingId).data.clientId == request.auth.uid
         && bookingDoc(request.resource.data.bookingId).data.providerId == request.resource.data.providerId
         && request.resource.data.amountSar == bookingDoc(request.resource.data.bookingId).data.priceTotal;
-      // Provider may settle their own held payment: only status/captureId may
-      // change (the actual capture/void is performed server-side with the
-      // secret key before this write).
-      allow update: if isAdmin() || (
-        signedIn()
-        && resource.data.providerId == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'captureId'])
-      );
+      // status/captureId are written server-side (with the Moyasar secret key,
+      // after the real capture/void/refund call succeeds) via the Admin SDK,
+      // which bypasses these rules entirely — so clients never need direct
+      // write access here. Letting the provider write it themselves would let
+      // them fake a "CAPTURED" status without any money ever moving.
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
@@ -157,11 +168,11 @@ service cloud.firestore {
 
     match /reviews/{reviewId} {
       allow read: if true;
-      // Allow clients to create reviews (check activeRole is CLIENT or roles include CLIENT or has no role yet)
-      allow create: if signedIn() && request.resource.data.clientId == request.auth.uid;
+      // Only clients may create reviews, and only under their own identity.
+      allow create: if signedIn() && isClient() && request.resource.data.clientId == request.auth.uid;
       // Allow providers to add reply to reviews about them, and admins to update anything
       allow update: if isAdmin() || (
-        signedIn() && isProvider() && 
+        signedIn() && isProvider() &&
         resource.data.providerId == request.auth.uid &&
         // Only allow adding reply fields, not modifying rating/comment
         request.resource.data.rating == resource.data.rating &&
@@ -194,6 +205,18 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    match /verifications/{verificationId} {
+      allow read: if signedIn() && (
+        resource.data.providerId == request.auth.uid || isAdmin()
+      );
+      allow create: if signedIn() && isProvider()
+        && request.resource.data.providerId == request.auth.uid
+        && request.resource.data.status == "PENDING";
+      // Only admin decides approve/reject.
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }
