@@ -97,12 +97,16 @@ const AdminOrdersPage: React.FC = () => {
     });
   }, [bookings, searchQuery, statusFilter, providerNameMap]);
 
-  const formatDate = (date: Date) =>
-    new Date(date).toLocaleDateString(isArabic ? "ar-SA" : "en-US", {
+  const formatDate = (date: Date | undefined | null) => {
+    if (!date) return "—";
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString(isArabic ? "ar-SA" : "en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
     });
+  };
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -199,7 +203,7 @@ const AdminOrdersPage: React.FC = () => {
                       {providerNameMap[booking.providerId] || t("admin.notProvided")}
                     </td>
                     <td className="p-3">{booking.serviceName || t("admin.notProvided")}</td>
-                    <td className="p-3 font-medium">{booking.priceTotal.toFixed(2)} SAR</td>
+                    <td className="p-3 font-medium">{(booking.priceTotal || 0).toFixed(2)} SAR</td>
                     <td className="p-3 text-muted-foreground">
                       {(commissionByBookingId[booking.id] || 0).toFixed(2)} SAR
                     </td>
