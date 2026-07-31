@@ -66,12 +66,15 @@ service cloud.firestore {
     match /providers/{providerId} {
       allow read: if true;
       allow create: if signedIn() && (providerId == request.auth.uid || isAdmin());
-      // Owner/admin may update their profile, but ratingAvg/ratingCount are
-      // computed server-side (see functions/onReviewWritten) from real reviews —
+      // Owner/admin may update their profile, but ratingAvg/ratingCount and
+      // the isVerified/verifiedAt "Trusted Provider" badge are computed
+      // server-side (see functions/onReviewWritten) from real reviews —
       // not even the owner may write them directly.
       allow update: if isAdmin() || (
         signedIn() && providerId == request.auth.uid &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ratingAvg', 'ratingCount'])
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+          ['ratingAvg', 'ratingCount', 'isVerified', 'verifiedAt']
+        )
       );
       allow delete: if isAdmin();
     }

@@ -226,7 +226,10 @@ const ProviderProfilePage: React.FC = () => {
                     {provider.displayName || t("provider.provider")}
                   </h2>
                   {provider.isVerified && (
-                    <CheckCircle className="h-5 w-5 text-primary" />
+                    <CheckCircle
+                      className="h-5 w-5 text-blue-500"
+                      aria-label={t("provider.verified")}
+                    />
                   )}
                 </div>
 

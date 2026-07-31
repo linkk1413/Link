@@ -1579,62 +1579,17 @@ export const updateBookingStatus = async (
 ): Promise<void> => {
   const bookingRef = doc(db, COLLECTIONS.BOOKINGS, id);
 
-  // Get the booking to find the providerId for badge check
-  const bookingSnap = await getDoc(bookingRef);
-  const bookingData = bookingSnap.data();
-
   await updateDoc(bookingRef, {
     status,
     updatedAt: serverTimestamp(),
   });
-
-  // If status changed to COMPLETED, check if provider should get Trusted badge
-  if (status === "COMPLETED" && bookingData?.providerId) {
-    await checkAndGrantTrustedBadge(bookingData.providerId);
-  }
 };
 
-// Check if provider has 10+ completed bookings and grant Trusted Provider badge
-export const checkAndGrantTrustedBadge = async (
-  providerId: string,
-): Promise<boolean> => {
-  try {
-    // First check if provider already has the badge
-    const providerRef = doc(db, COLLECTIONS.PROVIDERS, providerId);
-    const providerSnap = await getDoc(providerRef);
-
-    if (!providerSnap.exists()) return false;
-
-    const providerData = providerSnap.data();
-    if (providerData.isVerified) {
-      // Already has the badge
-      return true;
-    }
-
-    // Count completed bookings
-    const bookingsRef = collection(db, COLLECTIONS.BOOKINGS);
-    const q = query(
-      bookingsRef,
-      where("providerId", "==", providerId),
-      where("status", "==", "COMPLETED"),
-    );
-    const snapshot = await getDocs(q);
-    const completedCount = snapshot.size;
-
-    // If 10 or more completed bookings, grant the badge
-    if (completedCount >= 10) {
-      await updateDoc(providerRef, {
-        isVerified: true,
-        verifiedAt: serverTimestamp(),
-      });
-      return true;
-    }
-
-    return false;
-  } catch (error) {
-    return false;
-  }
-};
+// The "Trusted Provider" blue-checkmark badge (providers.isVerified) is now
+// granted automatically server-side by the onReviewWritten Cloud Function
+// once a provider reaches 50 reviews rated above 3 stars — see
+// functions/index.js. firestore.rules blocks clients from writing
+// isVerified/verifiedAt directly, so there is no client-side grant here.
 
 // ============================================
 // PAYMENTS

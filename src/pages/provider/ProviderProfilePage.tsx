@@ -20,6 +20,7 @@ import {
   Star,
   Trash2,
   MapPin,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -50,15 +51,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useGuest } from "@/contexts/GuestContext";
 import { useRequestTrackingConsent } from "@/components/TrackingConsent";
 import { updateUserProfile } from "@/lib/firestore";
-import { useProviderBookings } from "@/hooks/queries/useBookings";
-import {
-  collection,
-  addDoc,
-  serverTimestamp,
-  doc,
-  updateDoc,
-} from "firebase/firestore";
-import { db, auth, storage } from "@/lib/firebase";
+import { storage } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { sendEmailVerification } from "firebase/auth";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -127,18 +120,15 @@ const ProviderProfilePage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
 
   const { data: providerProfile } = useProviderProfile(user?.uid || "");
-  const { data: providerBookings = [] } = useProviderBookings(user?.uid || "");
-  const completedBookingsCount = providerBookings.filter(
-    (b) => b.status === "COMPLETED",
-  ).length;
 
   // Email verification status (from Firebase Auth)
   const isEmailVerified = firebaseUser?.emailVerified || false;
   const [isSendingVerification, setIsSendingVerification] = useState(false);
 
-  // Trusted Provider badge (earned after 10 completed bookings)
+  // Trusted Provider badge — granted automatically server-side (see
+  // functions/onReviewWritten) once a provider has 50+ reviews rated above
+  // 3 stars. Clients can't write isVerified themselves (firestore.rules).
   const isTrustedProvider = providerProfile?.isVerified || false;
-  const progressToTrusted = Math.min(completedBookingsCount, 10);
 
   // Identity verification (admin-approved, required to publish services)
   const { data: verificationRequest } = useProviderVerification(
@@ -195,28 +185,6 @@ const ProviderProfilePage: React.FC = () => {
     }
   };
 
-  // Auto-grant Trusted Provider badge when reaching 10 completed bookings
-  useEffect(() => {
-    const checkAndGrantBadge = async () => {
-      if (
-        completedBookingsCount >= 10 &&
-        !isTrustedProvider &&
-        user?.uid &&
-        providerProfile
-      ) {
-        try {
-          const providerRef = doc(db, "providers", user.uid);
-          await updateDoc(providerRef, {
-            isVerified: true,
-            verifiedAt: new Date(),
-          });
-        } catch (error) {
-          console.error("Error granting trusted badge:", error);
-        }
-      }
-    };
-    checkAndGrantBadge();
-  }, [completedBookingsCount, isTrustedProvider, user?.uid, providerProfile]);
   const updateProviderProfileMutation = useUpdateProviderProfile();
 
   const [formValues, setFormValues] = useState({
@@ -872,12 +840,13 @@ const ProviderProfilePage: React.FC = () => {
                     <span>{t("profile.trustedProviderBadge")}</span>
                   </div>
                   {isTrustedProvider ? (
-                    <Badge className="bg-green-500">
+                    <Badge className="bg-blue-500 gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
                       {t("profile.trusted")}
                     </Badge>
                   ) : (
                     <span className="text-sm text-muted-foreground">
-                      {progressToTrusted}/10 {t("profile.bookingsCompleted")}
+                      {t("profile.trustedBadgeHint")}
                     </span>
                   )}
                 </div>

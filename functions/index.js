@@ -381,11 +381,26 @@ exports.onReviewWritten = onDocumentWritten(
       ? Math.round((ratings.reduce((sum, r) => sum + r, 0) / ratingCount) * 10) / 10
       : 0;
 
-    await db.collection("providers").doc(providerId).update({
+    const updates = {
       ratingAvg,
       ratingCount,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+
+    // "Trusted Provider" blue-checkmark badge — granted automatically once
+    // and never revoked, after 50+ reviews rated above 3 stars. Replaces the
+    // old client-side "10 completed bookings" rule.
+    const positiveReviewCount = ratings.filter((r) => r > 3).length;
+    if (positiveReviewCount >= 50) {
+      const providerRef = db.collection("providers").doc(providerId);
+      const providerSnap = await providerRef.get();
+      if (providerSnap.exists && !providerSnap.data().isVerified) {
+        updates.isVerified = true;
+        updates.verifiedAt = admin.firestore.FieldValue.serverTimestamp();
+      }
+    }
+
+    await db.collection("providers").doc(providerId).update(updates);
   },
 );
 
