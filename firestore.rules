@@ -223,9 +223,25 @@ service cloud.firestore {
         resource.data.reporterId == request.auth.uid ||
         isAdmin()
       );
-      allow create: if signedIn();
+      allow create: if signedIn() && request.resource.data.reporterId == request.auth.uid;
       allow update: if isAdmin();
       allow delete: if isAdmin();
+
+      // Internal moderation notes — admin-only in both directions, so the
+      // reporter (who can read the parent report doc above) never sees them.
+      match /internalNotes/{noteId} {
+        allow read, write: if isAdmin();
+      }
+    }
+
+    // Sequential report numbers. Anyone signed in may bump it by exactly one
+    // inside the createReport transaction (create bootstraps it at 1 the
+    // first time; update must always be exactly +1) — nothing else is valid.
+    match /counters/reports {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.count == 1;
+      allow update: if signedIn() &&
+        request.resource.data.count == resource.data.count + 1;
     }
 
     match /blockedUsers/{blockId} {

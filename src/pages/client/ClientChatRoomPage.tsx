@@ -345,8 +345,10 @@ const ClientChatRoomPage: React.FC = () => {
           targetId={chat.providerId}
           reporterId={user.uid}
           reporterName={user.name || user.displayName}
+          reporterEmail={user.email}
           targetOwnerId={chat.providerId}
           targetOwnerName={providerName}
+          chatId={chat.id}
         />
       )}
     </div>

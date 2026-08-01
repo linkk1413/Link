@@ -16,6 +16,7 @@ import {
   serverTimestamp,
   Timestamp,
   writeBatch,
+  runTransaction,
   QueryDocumentSnapshot,
   DocumentData,
 } from "firebase/firestore";
@@ -37,6 +38,7 @@ import {
   Report,
   ReportStatus,
   ReportTargetType,
+  ReportInternalNote,
   BlockedUser,
 } from "@/types";
 
@@ -2130,15 +2132,42 @@ export const updateSubscriptionSettings = async (
 
 // ==================== REPORTS ====================
 
-export const createReport = async (
-  data: Omit<Report, "id" | "createdAt" | "status">,
-): Promise<string> => {
-  const colRef = collection(db, COLLECTIONS.REPORTS);
-  const docRef = await addDoc(colRef, {
-    ...data,
-    status: "PENDING" as ReportStatus,
-    createdAt: serverTimestamp(),
+// Firestore rejects any field whose value is `undefined` (throws instead of
+// silently dropping it) — every optional field on Report can legitimately be
+// undefined (an unfilled "additional details" box, a report with no images),
+// so every write here is stripped first.
+const stripUndefinedFields = <T extends Record<string, unknown>>(
+  obj: T,
+): Partial<T> =>
+  Object.fromEntries(
+    Object.entries(obj).filter(([, value]) => value !== undefined),
+  ) as Partial<T>;
+
+const getNextReportNumber = async (): Promise<number> => {
+  const counterRef = doc(db, "counters", "reports");
+  return runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(counterRef);
+    const next = snap.exists() ? (Number(snap.data().count) || 0) + 1 : 1;
+    transaction.set(counterRef, { count: next }, { merge: true });
+    return next;
   });
+};
+
+export const createReport = async (
+  data: Omit<Report, "id" | "createdAt" | "status" | "reportNumber">,
+): Promise<string> => {
+  const reportNumber = await getNextReportNumber();
+  const colRef = collection(db, COLLECTIONS.REPORTS);
+  const docRef = await addDoc(
+    colRef,
+    stripUndefinedFields({
+      ...data,
+      reportNumber,
+      status: "NEW" as ReportStatus,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }),
+  );
   return docRef.id;
 };
 
@@ -2154,6 +2183,7 @@ export const getReports = async (
       id: d.id,
       ...data,
       createdAt: timestampToDate(data.createdAt),
+      updatedAt: data.updatedAt ? timestampToDate(data.updatedAt) : undefined,
       resolvedAt: data.resolvedAt
         ? timestampToDate(data.resolvedAt)
         : undefined,
@@ -2163,6 +2193,21 @@ export const getReports = async (
     return reports.filter((r) => r.status === statusFilter);
   }
   return reports;
+};
+
+export const getReportById = async (
+  reportId: string,
+): Promise<Report | null> => {
+  const snap = await getDoc(doc(db, COLLECTIONS.REPORTS, reportId));
+  if (!snap.exists()) return null;
+  const data = snap.data();
+  return {
+    id: snap.id,
+    ...data,
+    createdAt: timestampToDate(data.createdAt),
+    updatedAt: data.updatedAt ? timestampToDate(data.updatedAt) : undefined,
+    resolvedAt: data.resolvedAt ? timestampToDate(data.resolvedAt) : undefined,
+  } as Report;
 };
 
 export const getReportsByReporter = async (
@@ -2185,20 +2230,74 @@ export const getReportsByReporter = async (
   });
 };
 
+// Statuses that represent the report being done with, as opposed to still
+// active (NEW/UNDER_REVIEW/AWAITING_*). Moving to one of these stamps
+// resolvedAt/resolvedBy; moving back out (reopening) clears them.
+const TERMINAL_REPORT_STATUSES: ReportStatus[] = ["RESOLVED", "REJECTED", "CLOSED"];
+
 export const updateReportStatus = async (
   reportId: string,
   status: ReportStatus,
-  adminNotes?: string,
   resolvedBy?: string,
 ): Promise<void> => {
   const docRef = doc(db, COLLECTIONS.REPORTS, reportId);
-  const updates: Record<string, unknown> = { status };
-  if (adminNotes !== undefined) updates.adminNotes = adminNotes;
-  if (status === "RESOLVED" || status === "DISMISSED") {
+  const updates: Record<string, unknown> = { status, updatedAt: serverTimestamp() };
+  if (TERMINAL_REPORT_STATUSES.includes(status)) {
     updates.resolvedAt = serverTimestamp();
     if (resolvedBy) updates.resolvedBy = resolvedBy;
+  } else {
+    updates.resolvedAt = deleteField();
+    updates.resolvedBy = deleteField();
   }
   await updateDoc(docRef, updates);
+};
+
+export const getReportInternalNotes = async (
+  reportId: string,
+): Promise<ReportInternalNote[]> => {
+  const colRef = collection(db, COLLECTIONS.REPORTS, reportId, "internalNotes");
+  const q = query(colRef, orderBy("createdAt", "asc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      ...data,
+      createdAt: timestampToDate(data.createdAt),
+    } as ReportInternalNote;
+  });
+};
+
+export const addReportInternalNote = async (
+  reportId: string,
+  authorId: string,
+  note: string,
+  authorName?: string,
+): Promise<string> => {
+  const colRef = collection(db, COLLECTIONS.REPORTS, reportId, "internalNotes");
+  const docRef = await addDoc(
+    colRef,
+    stripUndefinedFields({
+      authorId,
+      authorName,
+      note,
+      createdAt: serverTimestamp(),
+    }),
+  );
+  return docRef.id;
+};
+
+// Permanently deletes a report and its internal notes (admin only, per
+// firestore.rules). Irreversible.
+export const deleteReport = async (reportId: string): Promise<void> => {
+  const notesRef = collection(db, COLLECTIONS.REPORTS, reportId, "internalNotes");
+  const notesSnap = await getDocs(notesRef);
+  if (!notesSnap.empty) {
+    const batch = writeBatch(db);
+    notesSnap.docs.forEach((noteDoc) => batch.delete(noteDoc.ref));
+    await batch.commit();
+  }
+  await deleteDoc(doc(db, COLLECTIONS.REPORTS, reportId));
 };
 
 // ==================== BLOCKED USERS ====================

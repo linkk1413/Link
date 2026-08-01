@@ -54,8 +54,41 @@ export type ReportTargetType =
   | "MESSAGE"
   | "REVIEW";
 
-// Report status
-export type ReportStatus = "PENDING" | "REVIEWED" | "RESOLVED" | "DISMISSED";
+// Report status. NEW/UNDER_REVIEW/AWAITING_*/RESOLVED/REJECTED/CLOSED are the
+// current set; PENDING/REVIEWED/DISMISSED are kept so reports created before
+// this status overhaul still type-check and display correctly — new reports
+// never get written with the legacy values.
+export type ReportStatus =
+  | "NEW"
+  | "UNDER_REVIEW"
+  | "AWAITING_CLIENT_REPLY"
+  | "AWAITING_PROVIDER_REPLY"
+  | "RESOLVED"
+  | "REJECTED"
+  | "CLOSED"
+  | "PENDING"
+  | "REVIEWED"
+  | "DISMISSED";
+
+// Report reason — real violations that need admin action. Service-quality
+// complaints (no-show, late, payment issues, refunds) belong in reviews, not
+// reports.
+export type ReportReason =
+  | "abusive_language"
+  | "spam"
+  | "fraud_attempt"
+  | "impersonation"
+  | "inappropriate_content"
+  | "terms_violation"
+  | "harassment"
+  | "threat_blackmail"
+  | "suspicious_account"
+  | "other";
+
+export interface ReportAttachment {
+  url: string;
+  name: string;
+}
 
 // User interface
 export interface User {
@@ -291,20 +324,44 @@ export interface Review {
 // Report
 export interface Report {
   id: string;
+  reportNumber?: number; // sequential, assigned via a counter transaction — absent on reports predating this
   reporterId: string;
   reporterName?: string;
+  reporterEmail?: string;
+  reporterPhone?: string;
   targetType: ReportTargetType;
   targetId: string;
-  reason: string;
+  reason: ReportReason | string;
   description?: string;
   status: ReportStatus;
   // Context fields for admin display
   targetOwnerId?: string; // e.g. provider who owns the review, or user being reported
   targetOwnerName?: string;
+  targetOwnerEmail?: string;
+  targetOwnerPhone?: string;
   targetContent?: string; // snapshot of the reported content (review text, message, etc.)
+  images?: ReportAttachment[];
+  chatId?: string; // conversation this report originated from, if any
+  serviceId?: string; // service this report relates to, if any
+  bookingId?: string; // order this report relates to, if any
+  // Deprecated: superseded by the reports/{id}/internalNotes subcollection,
+  // which — unlike this field — isn't readable by the reporter. Kept
+  // optional so reports written before the change still type-check.
   adminNotes?: string;
   resolvedAt?: Date;
   resolvedBy?: string;
+  createdAt: Date;
+  updatedAt?: Date;
+}
+
+// Internal note on a report — admin-only, stored in a subcollection so
+// firestore.rules can keep it out of the reporter's read access entirely
+// (a top-level field on the report doc would be readable by the reporter).
+export interface ReportInternalNote {
+  id: string;
+  authorId: string;
+  authorName?: string;
+  note: string;
   createdAt: Date;
 }
 

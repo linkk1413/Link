@@ -65,6 +65,7 @@ import AdminVerificationsPage from "@/pages/admin/AdminVerificationsPage";
 import AdminPayoutsPage from "@/pages/admin/AdminPayoutsPage";
 import AdminSubscriptionsPage from "@/pages/admin/AdminSubscriptionsPage";
 import AdminReportsPage from "@/pages/admin/AdminReportsPage";
+import AdminReportDetailPage from "@/pages/admin/AdminReportDetailPage";
 import AdminSettingsPage from "@/pages/admin/AdminSettingsPage";
 import AdminOrdersPage from "@/pages/admin/AdminOrdersPage";
 
@@ -205,6 +206,7 @@ const AppRoutes = () => {
         <Route path="payouts" element={<AdminPayoutsPage />} />
         <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
         <Route path="reports" element={<AdminReportsPage />} />
+        <Route path="reports/:id" element={<AdminReportDetailPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
         <Route path="orders" element={<AdminOrdersPage />} />
       </Route>

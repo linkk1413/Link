@@ -358,9 +358,12 @@ const ProviderReviewsPage: React.FC = () => {
             targetId={reviewToReport.id}
             reporterId={user?.uid || ""}
             reporterName={user?.name || user?.displayName}
+            reporterEmail={user?.email}
             targetOwnerId={reviewToReport.clientId}
             targetOwnerName={reviewToReport.clientName}
             targetContent={reviewToReport.comment}
+            serviceId={reviewToReport.serviceId}
+            bookingId={reviewToReport.bookingId}
           />
         )}
       </main>

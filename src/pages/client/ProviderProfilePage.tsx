@@ -523,6 +523,7 @@ const ProviderProfilePage: React.FC = () => {
           targetId={id}
           reporterId={user.uid}
           reporterName={user.name || user.displayName}
+          reporterEmail={user.email}
           targetOwnerId={id}
           targetOwnerName={provider?.displayName}
         />
