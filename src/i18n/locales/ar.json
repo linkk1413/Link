@@ -422,12 +422,12 @@
         ]
       },
       "reportContact": {
-        "title": "الإبلاغ عن محتوى غير لائق",
+        "title": "تقديم شكوى عن محتوى غير لائق",
         "items": [
-          "إذا صادفتِ محتوى غير لائق، استخدمي زر 'إبلاغ' على المحتوى أو ملف المستخدم.",
+          "إذا صادفتِ محتوى غير لائق، استخدمي زر 'تقديم شكوى' على المحتوى أو ملف المستخدم.",
           "يمكنك أيضاً حظر المستخدمين الذين ينتهكون إرشادات المجتمع.",
           "للمخاوف الأمنية العاجلة، تواصلي معنا مباشرة على 60azsazs@gmail.com.",
-          "يتم مراجعة جميع البلاغات خلال 24 ساعة."
+          "يتم مراجعة جميع الشكاوى خلال 24 ساعة."
         ]
       }
     },
@@ -578,7 +578,7 @@
       "verifications": "التوثيقات",
       "payouts": "المدفوعات",
       "subscriptions": "الاشتراكات",
-      "reports": "البلاغات",
+      "reports": "الشكاوى",
       "settings": "الإعدادات",
       "orders": "الطلبات"
     },
@@ -595,7 +595,7 @@
     "accountDeleted": "تم حذف الحساب",
     "lastLogin": "آخر تسجيل دخول",
     "orderCount": "الطلبات",
-    "reportCount": "البلاغات",
+    "reportCount": "الشكاوى",
     "backToUsers": "العودة إلى المستخدمات",
     "userNotFound": "المستخدمة غير موجودة",
     "tabOverview": "نظرة عامة",
@@ -1032,8 +1032,8 @@
     "blocked": "رسالتك تحتوي على محتوى غير لائق. يرجى تعديلها."
   },
   "report": {
-    "title": "الإبلاغ عن محتوى",
-    "description": "ساعدينا في الحفاظ على أمان المجتمع بالإبلاغ عن المحتوى غير اللائق.",
+    "title": "تقديم شكوى",
+    "description": "ساعدينا في الحفاظ على أمان المجتمع بتقديم شكوى عن المحتوى غير اللائق.",
     "reason": "السبب",
     "selectReason": "اختاري سبباً",
     "reasons": {
@@ -1050,17 +1050,17 @@
     },
     "details": "تفاصيل إضافية",
     "detailsPlaceholder": "صفي المشكلة...",
-    "otherReasonRequiresDetails": "يرجى شرح سبب هذا البلاغ.",
+    "otherReasonRequiresDetails": "يرجى شرح سبب هذه الشكوى.",
     "attachImages": "إرفاق صور",
     "invalidImageType": "يمكن إرفاق ملفات الصور فقط.",
     "imageTooLarge": "يجب ألا يتجاوز حجم كل صورة 5 ميجابايت.",
-    "submit": "إرسال البلاغ",
-    "success": "تم إرسال البلاغ بنجاح، وسيتم مراجعته من قبل الإدارة.",
-    "submitFailed": "فشل إرسال البلاغ",
-    "reasonRequired": "يرجى اختيار سبب البلاغ.",
-    "flagReview": "الإبلاغ عن التقييم",
-    "reportProvider": "الإبلاغ عن مقدمة الخدمات",
-    "reportUser": "الإبلاغ عن المستخدم"
+    "submit": "إرسال الشكوى",
+    "success": "تم إرسال الشكوى بنجاح، وسيتم مراجعتها من قبل الإدارة.",
+    "submitFailed": "فشل إرسال الشكوى",
+    "reasonRequired": "يرجى اختيار سبب الشكوى.",
+    "flagReview": "تقديم شكوى عن التقييم",
+    "reportProvider": "تقديم شكوى ضد مقدمة الخدمات",
+    "reportUser": "تقديم شكوى ضد المستخدم"
   },
   "adminReviews": {
     "noReviews": "لا توجد تقييمات",
@@ -1101,18 +1101,18 @@
     "unblocked": "تم إلغاء حظر المستخدم."
   },
   "adminReports": {
-    "title": "البلاغات والإشراف",
-    "subtitle": "مراجعة وإدارة بلاغات المستخدمين",
-    "searchPlaceholder": "البحث برقم البلاغ أو السبب أو الاسم...",
-    "noReports": "لا توجد بلاغات",
+    "title": "الشكاوى",
+    "subtitle": "مراجعة وإدارة شكاوى المستخدمين",
+    "searchPlaceholder": "البحث برقم الشكوى أو السبب أو الاسم...",
+    "noReports": "لا توجد شكاوى",
     "status": {
-      "NEW": "جديد",
+      "NEW": "جديدة",
       "UNDER_REVIEW": "قيد المراجعة",
       "AWAITING_CLIENT_REPLY": "بانتظار رد العميل",
       "AWAITING_PROVIDER_REPLY": "بانتظار رد مقدمة الخدمة",
       "RESOLVED": "تم الحل",
-      "REJECTED": "تم رفض البلاغ",
-      "CLOSED": "تم إغلاق البلاغ"
+      "REJECTED": "تم رفض الشكوى",
+      "CLOSED": "تم إغلاق الشكوى"
     },
     "targetType": {
       "USER": "مستخدم",
@@ -1122,34 +1122,64 @@
       "MESSAGE": "رسالة",
       "REVIEW": "تقييم"
     },
-    "reportNumber": "بلاغ رقم",
-    "reportedBy": "بلاغ من",
-    "reportedUser": "المستخدم المُبلَّغ عنه",
-    "reportDetails": "تفاصيل البلاغ",
-    "reportedContent": "المحتوى المُبلَّغ عنه",
+    "reportNumber": "شكوى رقم",
+    "reportedBy": "شكوى من",
+    "reportedUser": "المستخدم المُشتكى عليه",
+    "reportDetails": "تفاصيل الشكوى",
+    "reportedContent": "المحتوى محل الشكوى",
     "attachedImages": "الصور المرفقة",
     "linkedReview": "التقييم المرتبط",
     "linkedService": "الخدمة المرتبطة",
     "linkedChat": "المحادثة المرتبطة",
     "date": "تاريخ الإنشاء",
     "lastUpdated": "آخر تحديث",
+    "messagesAndTimeline": "الرسائل والسجل الزمني",
+    "messagesHint": "أي رسالة تُرسل هنا تظهر مباشرة لمقدم الشكوى.",
+    "noActivityYet": "لا يوجد نشاط بعد",
+    "sendReply": "إرسال",
+    "quickReplies": {
+      "received": "تم استلام الشكوى",
+      "reviewing": "جاري مراجعة الشكوى",
+      "needMoreInfo": "نحتاج إلى معلومات إضافية",
+      "resolved": "تم حل الشكوى",
+      "closed": "تم إغلاق الشكوى",
+      "contactUs": "إذا واجهت أي مشكلة أخرى فلا تتردد في التواصل معنا"
+    },
     "internalNotes": "ملاحظات داخلية",
-    "internalNotesHint": "تظهر للإدارة فقط — لا تظهر أبداً لمقدم البلاغ أو المُبلَّغ عنه.",
-    "adminNotesPlaceholder": "أضيفي ملاحظة داخلية حول هذا البلاغ...",
+    "internalNotesHint": "تظهر للإدارة فقط — لا تظهر أبداً لمقدم الشكوى أو المُشتكى عليه.",
+    "adminNotesPlaceholder": "أضيفي ملاحظة داخلية حول هذه الشكوى...",
     "addNote": "إضافة ملاحظة",
     "deleteContent": "حذف المحتوى",
     "contentDeleted": "تم حذف المحتوى بنجاح.",
-    "statusUpdated": "تم تحديث حالة البلاغ.",
-    "reopen": "إعادة فتح البلاغ",
-    "deleteReport": "حذف البلاغ",
-    "deleteReportTitle": "حذف هذا البلاغ نهائياً؟",
-    "deleteReportWarning": "سيتم حذف البلاغ وكل ملاحظاته الداخلية. لا يمكن التراجع عن هذا الإجراء.",
-    "reportDeleted": "تم حذف البلاغ.",
-    "reportNotFound": "البلاغ غير موجود",
-    "backToReports": "العودة إلى البلاغات",
+    "statusUpdated": "تم تحديث حالة الشكوى.",
+    "reopen": "إعادة فتح الشكوى",
+    "deleteReport": "حذف الشكوى",
+    "deleteReportTitle": "حذف هذه الشكوى نهائياً؟",
+    "deleteReportWarning": "سيتم حذف الشكوى وكل رسائلها وملاحظاتها الداخلية. لا يمكن التراجع عن هذا الإجراء.",
+    "reportDeleted": "تم حذف الشكوى.",
+    "reportNotFound": "الشكوى غير موجودة",
+    "backToReports": "العودة إلى الشكاوى",
     "filterStatus": "الحالة",
     "filterAllStatuses": "كل الحالات",
     "filterFrom": "من تاريخ",
     "filterTo": "إلى تاريخ"
+  },
+  "complaints": {
+    "title": "الشكاوى",
+    "subtitle": "تابعي جميع الشكاوى التي أرسلتها",
+    "none": "لا توجد شكاوى بعد",
+    "notFound": "الشكوى غير موجودة",
+    "status": {
+      "NEW": "جديدة",
+      "UNDER_REVIEW": "قيد المراجعة",
+      "AWAITING_CLIENT_REPLY": "بانتظار معلومات إضافية",
+      "AWAITING_PROVIDER_REPLY": "بانتظار معلومات إضافية",
+      "RESOLVED": "تم حل الشكوى",
+      "REJECTED": "تم رفض الشكوى",
+      "CLOSED": "تم إغلاق الشكوى"
+    },
+    "messagePlaceholder": "اكتبي رسالتك هنا...",
+    "timelineCreated": "تم إنشاء الشكوى",
+    "timelineStatusChange": "تم تغيير الحالة إلى: {{status}}"
   }
 }

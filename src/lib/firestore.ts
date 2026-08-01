@@ -17,6 +17,7 @@ import {
   Timestamp,
   writeBatch,
   runTransaction,
+  onSnapshot,
   QueryDocumentSnapshot,
   DocumentData,
 } from "firebase/firestore";
@@ -39,6 +40,7 @@ import {
   ReportStatus,
   ReportTargetType,
   ReportInternalNote,
+  ReportActivityEntry,
   BlockedUser,
 } from "@/types";
 
@@ -2168,6 +2170,20 @@ export const createReport = async (
       updatedAt: serverTimestamp(),
     }),
   );
+
+  // Best-effort: the report itself already exists even if this fails, so a
+  // missing first timeline entry isn't worth failing the whole submission.
+  try {
+    await addReportActivity(docRef.id, {
+      type: "CREATED",
+      actorId: data.reporterId,
+      actorName: data.reporterName,
+      actorRole: "USER",
+    });
+  } catch (err) {
+    console.warn("Failed to log report creation activity:", err);
+  }
+
   return docRef.id;
 };
 
@@ -2239,8 +2255,14 @@ export const updateReportStatus = async (
   reportId: string,
   status: ReportStatus,
   resolvedBy?: string,
+  resolvedByName?: string,
 ): Promise<void> => {
   const docRef = doc(db, COLLECTIONS.REPORTS, reportId);
+  const currentSnap = await getDoc(docRef);
+  const fromStatus = currentSnap.exists()
+    ? (currentSnap.data().status as ReportStatus)
+    : undefined;
+
   const updates: Record<string, unknown> = { status, updatedAt: serverTimestamp() };
   if (TERMINAL_REPORT_STATUSES.includes(status)) {
     updates.resolvedAt = serverTimestamp();
@@ -2250,6 +2272,21 @@ export const updateReportStatus = async (
     updates.resolvedBy = deleteField();
   }
   await updateDoc(docRef, updates);
+
+  if (fromStatus !== status) {
+    try {
+      await addReportActivity(reportId, {
+        type: "STATUS_CHANGE",
+        actorId: resolvedBy,
+        actorName: resolvedByName,
+        actorRole: "ADMIN",
+        fromStatus,
+        toStatus: status,
+      });
+    } catch (err) {
+      console.warn("Failed to log report status change activity:", err);
+    }
+  }
 };
 
 export const getReportInternalNotes = async (
@@ -2287,14 +2324,102 @@ export const addReportInternalNote = async (
   return docRef.id;
 };
 
-// Permanently deletes a report and its internal notes (admin only, per
-// firestore.rules). Irreversible.
+// ==================== REPORT ACTIVITY (timeline + messages) ====================
+// A report's activity feed doubles as its user-visible timeline (CREATED,
+// STATUS_CHANGE entries) and its message thread with the admin (MESSAGE
+// entries) — one chronological subcollection, rendered as either view.
+
+export const addReportActivity = async (
+  reportId: string,
+  entry: Omit<ReportActivityEntry, "id" | "createdAt">,
+): Promise<string> => {
+  const colRef = collection(db, COLLECTIONS.REPORTS, reportId, "activity");
+  const docRef = await addDoc(
+    colRef,
+    stripUndefinedFields({
+      ...entry,
+      createdAt: serverTimestamp(),
+    }),
+  );
+  return docRef.id;
+};
+
+export const sendReportMessage = async (
+  reportId: string,
+  actorId: string,
+  actorRole: "ADMIN" | "USER",
+  message: string,
+  actorName?: string,
+): Promise<string> =>
+  addReportActivity(reportId, { type: "MESSAGE", actorId, actorRole, actorName, message });
+
+// Realtime status for the "follow your complaint moment-to-moment" detail
+// page — react-query's cache alone can't do that, this pushes on every
+// server-side write. Returns the unsubscribe function.
+export const subscribeToReport = (
+  reportId: string,
+  callback: (report: Report | null) => void,
+): (() => void) => {
+  const docRef = doc(db, COLLECTIONS.REPORTS, reportId);
+  return onSnapshot(
+    docRef,
+    (snap) => {
+      if (!snap.exists()) {
+        callback(null);
+        return;
+      }
+      const data = snap.data();
+      callback({
+        id: snap.id,
+        ...data,
+        createdAt: timestampToDate(data.createdAt),
+        updatedAt: data.updatedAt ? timestampToDate(data.updatedAt) : undefined,
+        resolvedAt: data.resolvedAt ? timestampToDate(data.resolvedAt) : undefined,
+      } as Report);
+    },
+    // Not this user's report (or it was deleted) — surface as "not found"
+    // instead of an unhandled listener error.
+    () => callback(null),
+  );
+};
+
+export const subscribeToReportActivity = (
+  reportId: string,
+  callback: (entries: ReportActivityEntry[]) => void,
+): (() => void) => {
+  const colRef = collection(db, COLLECTIONS.REPORTS, reportId, "activity");
+  const q = query(colRef, orderBy("createdAt", "asc"));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      callback(
+        snapshot.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...data,
+            createdAt: timestampToDate(data.createdAt),
+          } as ReportActivityEntry;
+        }),
+      );
+    },
+    () => callback([]),
+  );
+};
+
+// Permanently deletes a report and its internal notes + activity (admin
+// only, per firestore.rules). Irreversible.
 export const deleteReport = async (reportId: string): Promise<void> => {
   const notesRef = collection(db, COLLECTIONS.REPORTS, reportId, "internalNotes");
-  const notesSnap = await getDocs(notesRef);
-  if (!notesSnap.empty) {
+  const activityRef = collection(db, COLLECTIONS.REPORTS, reportId, "activity");
+  const [notesSnap, activitySnap] = await Promise.all([
+    getDocs(notesRef),
+    getDocs(activityRef),
+  ]);
+  if (!notesSnap.empty || !activitySnap.empty) {
     const batch = writeBatch(db);
     notesSnap.docs.forEach((noteDoc) => batch.delete(noteDoc.ref));
+    activitySnap.docs.forEach((entryDoc) => batch.delete(entryDoc.ref));
     await batch.commit();
   }
   await deleteDoc(doc(db, COLLECTIONS.REPORTS, reportId));

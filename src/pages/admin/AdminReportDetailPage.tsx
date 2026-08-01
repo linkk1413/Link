@@ -36,8 +36,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { ReportActivityFeed } from "@/components/ReportActivityFeed";
 import {
-  useReport,
+  useReportLive,
+  useReportActivityLive,
+  useSendReportMessage,
   useUpdateReportStatus,
   useReportInternalNotes,
   useAddReportInternalNote,
@@ -67,6 +71,15 @@ const ALL_STATUSES: ReportStatus[] = [
   "CLOSED",
 ];
 
+const QUICK_REPLIES = [
+  "received",
+  "reviewing",
+  "needMoreInfo",
+  "resolved",
+  "closed",
+  "contactUs",
+] as const;
+
 // Legacy reports predate this status set — display them under their closest
 // modern equivalent without ever writing the old value back.
 const normalizeStatus = (status: ReportStatus): ReportStatus => {
@@ -85,16 +98,19 @@ const AdminReportDetailPage: React.FC = () => {
   const { id = "" } = useParams<{ id: string }>();
 
   const [noteText, setNoteText] = useState("");
+  const [replyText, setReplyText] = useState("");
   const [suspendConfirmOpen, setSuspendConfirmOpen] = useState(false);
   const [deleteUserConfirmOpen, setDeleteUserConfirmOpen] = useState(false);
   const [deleteReportConfirmOpen, setDeleteReportConfirmOpen] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
-  const { data: report, isLoading } = useReport(id);
+  const { data: report, isLoading } = useReportLive(id);
+  const { data: activity = [] } = useReportActivityLive(id);
   const { data: notes = [] } = useReportInternalNotes(id);
   const updateStatus = useUpdateReportStatus();
   const addNote = useAddReportInternalNote();
+  const sendMessage = useSendReportMessage();
   const deleteReportMutation = useDeleteReport();
   const suspendUser = useUpdateUserStatus();
   const deleteUserAccount = useDeleteUserAccount();
@@ -147,6 +163,7 @@ const AdminReportDetailPage: React.FC = () => {
         reportId: id,
         status: value as ReportStatus,
         resolvedBy: user?.uid,
+        resolvedByName: user?.name || user?.displayName,
       });
       toast.success(t("adminReports.statusUpdated"));
     } catch (error) {
@@ -167,6 +184,23 @@ const AdminReportDetailPage: React.FC = () => {
         note: noteText.trim(),
       });
       setNoteText("");
+    } catch (error) {
+      toast.error(t("common.error"));
+    }
+  };
+
+  const handleSendReply = async (text?: string) => {
+    const messageBody = (text ?? replyText).trim();
+    if (!messageBody || !user) return;
+    try {
+      await sendMessage.mutateAsync({
+        reportId: id,
+        actorId: user.uid,
+        actorRole: "ADMIN",
+        message: messageBody,
+        actorName: user.name || user.displayName,
+      });
+      setReplyText("");
     } catch (error) {
       toast.error(t("common.error"));
     }
@@ -546,6 +580,51 @@ const AdminReportDetailPage: React.FC = () => {
           </ScrollArea>
         </div>
       )}
+
+      {/* Messages with the complainant + timeline, in one thread */}
+      <div className="rounded-lg border border-border p-4">
+        <h3 className="mb-1 text-sm font-semibold text-foreground">{t("adminReports.messagesAndTimeline")}</h3>
+        <p className="mb-3 text-xs text-muted-foreground">{t("adminReports.messagesHint")}</p>
+        <ScrollArea className="mb-3 h-72 rounded-lg bg-muted/20 p-3">
+          <ReportActivityFeed
+            entries={activity}
+            currentUserId={user?.uid}
+            emptyMessage={t("adminReports.noActivityYet")}
+          />
+        </ScrollArea>
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {QUICK_REPLIES.map((key) => (
+            <Button
+              key={key}
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-auto whitespace-normal py-1 text-xs"
+              onClick={() => handleSendReply(t(`adminReports.quickReplies.${key}`))}
+              disabled={sendMessage.isPending}
+            >
+              {t(`adminReports.quickReplies.${key}`)}
+            </Button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <Input
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            placeholder={t("complaints.messagePlaceholder")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleSendReply();
+              }
+            }}
+          />
+          <Button onClick={() => handleSendReply()} disabled={!replyText.trim() || sendMessage.isPending}>
+            {sendMessage.isPending && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+            {t("adminReports.sendReply")}
+          </Button>
+        </div>
+      </div>
 
       {/* Internal notes */}
       <div className="rounded-lg border border-border p-4">

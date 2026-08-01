@@ -422,12 +422,12 @@
         ]
       },
       "reportContact": {
-        "title": "Report Inappropriate Content",
+        "title": "File a Complaint about Inappropriate Content",
         "items": [
-          "If you encounter inappropriate content, use the Report button on the content or user's profile.",
+          "If you encounter inappropriate content, use the Complaint button on the content or user's profile.",
           "You can also block users who violate community guidelines.",
           "For urgent safety concerns, contact us directly at 60azsazs@gmail.com.",
-          "All reports are reviewed within 24 hours."
+          "All complaints are reviewed within 24 hours."
         ]
       }
     },
@@ -578,7 +578,7 @@
       "verifications": "Verifications",
       "payouts": "Payouts",
       "subscriptions": "Subscriptions",
-      "reports": "Reports",
+      "reports": "Complaints",
       "settings": "Settings",
       "orders": "Orders"
     },
@@ -595,7 +595,7 @@
     "accountDeleted": "Account deleted",
     "lastLogin": "Last Login",
     "orderCount": "Orders",
-    "reportCount": "Reports",
+    "reportCount": "Complaints",
     "backToUsers": "Back to users",
     "userNotFound": "User not found",
     "tabOverview": "Overview",
@@ -1032,8 +1032,8 @@
     "blocked": "Your message contains inappropriate content. Please revise it."
   },
   "report": {
-    "title": "Report Content",
-    "description": "Help us keep the community safe by reporting inappropriate content.",
+    "title": "File a Complaint",
+    "description": "Help us keep the community safe by filing a complaint about inappropriate content.",
     "reason": "Reason",
     "selectReason": "Select a reason",
     "reasons": {
@@ -1050,17 +1050,17 @@
     },
     "details": "Additional details",
     "detailsPlaceholder": "Describe the issue...",
-    "otherReasonRequiresDetails": "Please explain the reason for this report.",
+    "otherReasonRequiresDetails": "Please explain the reason for this complaint.",
     "attachImages": "Attach images",
     "invalidImageType": "Only image files can be attached.",
     "imageTooLarge": "Each image must be under 5MB.",
-    "submit": "Submit Report",
-    "success": "Report submitted successfully and will be reviewed by our team.",
-    "submitFailed": "Failed to submit the report",
-    "reasonRequired": "Please select a reason for the report.",
-    "flagReview": "Report Review",
-    "reportProvider": "Report Provider",
-    "reportUser": "Report User"
+    "submit": "Submit Complaint",
+    "success": "Complaint submitted successfully and will be reviewed by our team.",
+    "submitFailed": "Failed to submit the complaint",
+    "reasonRequired": "Please select a reason for the complaint.",
+    "flagReview": "File a Complaint about this Review",
+    "reportProvider": "File a Complaint against the Provider",
+    "reportUser": "File a Complaint against the User"
   },
   "adminReviews": {
     "noReviews": "No reviews",
@@ -1101,10 +1101,10 @@
     "unblocked": "User unblocked."
   },
   "adminReports": {
-    "title": "Reports & Moderation",
-    "subtitle": "Review and manage user reports",
-    "searchPlaceholder": "Search by report #, reason, or name...",
-    "noReports": "No reports found",
+    "title": "Complaints",
+    "subtitle": "Review and manage user complaints",
+    "searchPlaceholder": "Search by complaint #, reason, or name...",
+    "noReports": "No complaints found",
     "status": {
       "NEW": "New",
       "UNDER_REVIEW": "Under review",
@@ -1122,34 +1122,64 @@
       "MESSAGE": "Message",
       "REVIEW": "Review"
     },
-    "reportNumber": "Report",
-    "reportedBy": "Reported by",
-    "reportedUser": "Reported user",
-    "reportDetails": "Report details",
-    "reportedContent": "Reported content",
+    "reportNumber": "Complaint",
+    "reportedBy": "Filed by",
+    "reportedUser": "Complaint against",
+    "reportDetails": "Complaint details",
+    "reportedContent": "Content in question",
     "attachedImages": "Attached images",
     "linkedReview": "Linked review",
     "linkedService": "Linked service",
     "linkedChat": "Linked conversation",
     "date": "Created at",
     "lastUpdated": "Last updated",
+    "messagesAndTimeline": "Messages & Timeline",
+    "messagesHint": "A message you send here appears immediately to the complainant.",
+    "noActivityYet": "No activity yet",
+    "sendReply": "Send",
+    "quickReplies": {
+      "received": "Your complaint has been received.",
+      "reviewing": "We're currently reviewing your complaint.",
+      "needMoreInfo": "We need some additional information from you.",
+      "resolved": "Your complaint has been resolved.",
+      "closed": "This complaint has been closed.",
+      "contactUs": "If you run into any other issue, don't hesitate to reach out to us."
+    },
     "internalNotes": "Internal notes",
-    "internalNotesHint": "Only visible to admins — never shown to the reporter or the reported user.",
-    "adminNotesPlaceholder": "Add an internal note about this report...",
+    "internalNotesHint": "Only visible to admins — never shown to the complainant or the reported user.",
+    "adminNotesPlaceholder": "Add an internal note about this complaint...",
     "addNote": "Add note",
     "deleteContent": "Delete Content",
     "contentDeleted": "Content deleted successfully.",
-    "statusUpdated": "Report status updated.",
+    "statusUpdated": "Complaint status updated.",
     "reopen": "Reopen",
-    "deleteReport": "Delete report",
-    "deleteReportTitle": "Permanently delete this report?",
-    "deleteReportWarning": "This deletes the report and its internal notes. It cannot be undone.",
-    "reportDeleted": "Report deleted.",
-    "reportNotFound": "Report not found",
-    "backToReports": "Back to reports",
+    "deleteReport": "Delete complaint",
+    "deleteReportTitle": "Permanently delete this complaint?",
+    "deleteReportWarning": "This deletes the complaint and all its messages and internal notes. It cannot be undone.",
+    "reportDeleted": "Complaint deleted.",
+    "reportNotFound": "Complaint not found",
+    "backToReports": "Back to complaints",
     "filterStatus": "Status",
     "filterAllStatuses": "All statuses",
     "filterFrom": "From",
     "filterTo": "To"
+  },
+  "complaints": {
+    "title": "Complaints",
+    "subtitle": "Track every complaint you've submitted",
+    "none": "No complaints yet",
+    "notFound": "Complaint not found",
+    "status": {
+      "NEW": "New",
+      "UNDER_REVIEW": "Under review",
+      "AWAITING_CLIENT_REPLY": "Awaiting more information",
+      "AWAITING_PROVIDER_REPLY": "Awaiting more information",
+      "RESOLVED": "Resolved",
+      "REJECTED": "Rejected",
+      "CLOSED": "Closed"
+    },
+    "messagePlaceholder": "Type your message...",
+    "timelineCreated": "Complaint created",
+    "timelineStatusChange": "Status changed to: {{status}}"
   }
 }

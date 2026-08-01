@@ -57,6 +57,10 @@ import SubscriptionPaymentPage from "@/pages/provider/SubscriptionPaymentPage";
 import SubscriptionCallbackPage from "@/pages/provider/SubscriptionCallbackPage";
 import ProviderReviewsPage from "@/pages/provider/ProviderReviewsPage";
 
+// Shared pages (used by both client and provider)
+import MyComplaintsPage from "@/pages/shared/MyComplaintsPage";
+import ComplaintDetailPage from "@/pages/shared/ComplaintDetailPage";
+
 // Admin pages
 import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
 import AdminUsersPage from "@/pages/admin/AdminUsersPage";
@@ -155,6 +159,8 @@ const AppRoutes = () => {
         <Route path="bookings/:bookingId" element={<BookingDetailsPage />} />
         <Route path="chats" element={<ClientChatsPage />} />
         <Route path="chats/:chatId" element={<ClientChatRoomPage />} />
+        <Route path="complaints" element={<MyComplaintsPage />} />
+        <Route path="complaints/:id" element={<ComplaintDetailPage />} />
         <Route path="profile" element={<ClientProfilePage />} />
         <Route path="provider/:id" element={<ProviderViewPage />} />
         <Route path="book/:serviceId" element={<BookingPage />} />
@@ -181,6 +187,8 @@ const AppRoutes = () => {
         <Route path="wallet" element={<ProviderWalletPage />} />
         <Route path="chats" element={<ProviderChatsPage />} />
         <Route path="chats/:chatId" element={<ProviderChatRoomPage />} />
+        <Route path="complaints" element={<MyComplaintsPage />} />
+        <Route path="complaints/:id" element={<ComplaintDetailPage />} />
         <Route path="profile" element={<ProviderProfilePage />} />
         <Route path="reviews" element={<ProviderReviewsPage />} />
         <Route path="subscription" element={<SubscriptionPaymentPage />} />

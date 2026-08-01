@@ -1,4 +1,5 @@
 // React Query hooks for Reports
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   createReport,
@@ -9,8 +10,11 @@ import {
   getReportInternalNotes,
   addReportInternalNote,
   deleteReport,
+  sendReportMessage,
+  subscribeToReport,
+  subscribeToReportActivity,
 } from "@/lib/firestore";
-import { Report, ReportStatus } from "@/types";
+import { Report, ReportActivityEntry, ReportStatus } from "@/types";
 
 export const reportKeys = {
   all: ["reports"] as const,
@@ -71,11 +75,13 @@ export const useUpdateReportStatus = () => {
       reportId,
       status,
       resolvedBy,
+      resolvedByName,
     }: {
       reportId: string;
       status: ReportStatus;
       resolvedBy?: string;
-    }) => updateReportStatus(reportId, status, resolvedBy),
+      resolvedByName?: string;
+    }) => updateReportStatus(reportId, status, resolvedBy, resolvedByName),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: reportKeys.all });
       queryClient.invalidateQueries({
@@ -126,5 +132,70 @@ export const useDeleteReport = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: reportKeys.all });
     },
+  });
+};
+
+// Live report status — "follow your complaint moment-to-moment" needs a
+// push update on every write, not a query that only refetches on its own
+// schedule. Mirrors useChatMessages' onSnapshot pattern.
+export const useReportLive = (reportId: string) => {
+  const [report, setReport] = useState<Report | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!reportId) {
+      setReport(null);
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    const unsubscribe = subscribeToReport(reportId, (data) => {
+      setReport(data);
+      setIsLoading(false);
+    });
+    return () => unsubscribe();
+  }, [reportId]);
+
+  return { data: report, isLoading };
+};
+
+// Live activity feed (timeline + messages) for a report.
+export const useReportActivityLive = (reportId: string) => {
+  const [entries, setEntries] = useState<ReportActivityEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!reportId) {
+      setEntries([]);
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    const unsubscribe = subscribeToReportActivity(reportId, (data) => {
+      setEntries(data);
+      setIsLoading(false);
+    });
+    return () => unsubscribe();
+  }, [reportId]);
+
+  return { data: entries, isLoading };
+};
+
+// Send a message on a report — either side (the reporter, or an admin).
+export const useSendReportMessage = () => {
+  return useMutation({
+    mutationFn: ({
+      reportId,
+      actorId,
+      actorRole,
+      message,
+      actorName,
+    }: {
+      reportId: string;
+      actorId: string;
+      actorRole: "ADMIN" | "USER";
+      message: string;
+      actorName?: string;
+    }) => sendReportMessage(reportId, actorId, actorRole, message, actorName),
   });
 };

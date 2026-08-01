@@ -24,6 +24,10 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/services/$(serviceId));
     }
 
+    function reportDoc(reportId) {
+      return get(/databases/$(database)/documents/reports/$(reportId));
+    }
+
     function hasUserDoc() {
       return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
@@ -231,6 +235,26 @@ service cloud.firestore {
       // reporter (who can read the parent report doc above) never sees them.
       match /internalNotes/{noteId} {
         allow read, write: if isAdmin();
+      }
+
+      // Timeline + two-way message thread with the reporter. Unlike
+      // internalNotes, the reporter can read this — and may add MESSAGE
+      // entries under their own identity (replying to the admin), but can
+      // never write a STATUS_CHANGE/CREATED entry or post as someone else.
+      match /activity/{entryId} {
+        allow read: if isAdmin() || (
+          signedIn() && reportDoc(reportId).data.reporterId == request.auth.uid
+        );
+        allow create: if isAdmin() || (
+          signedIn() &&
+          request.resource.data.type == 'MESSAGE' &&
+          request.resource.data.actorId == request.auth.uid &&
+          reportDoc(reportId).data.reporterId == request.auth.uid
+        );
+        // Append-only audit trail — no edits, ever. Deletion only happens as
+        // part of deleteReport (admin), to clean up when the report itself goes.
+        allow update: if false;
+        allow delete: if isAdmin();
       }
     }
 

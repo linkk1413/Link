@@ -365,6 +365,25 @@ export interface ReportInternalNote {
   createdAt: Date;
 }
 
+// One entry in a report's activity feed — both the visible "timeline"
+// (created / status changes) and the two-way message thread between the
+// admin and the person who filed the report are the same subcollection,
+// just rendered differently depending on `type`. Unlike ReportInternalNote,
+// this is readable by the reporter (see firestore.rules reports/{id}/activity).
+export type ReportActivityType = "CREATED" | "STATUS_CHANGE" | "MESSAGE";
+
+export interface ReportActivityEntry {
+  id: string;
+  type: ReportActivityType;
+  actorId?: string;
+  actorName?: string;
+  actorRole?: "ADMIN" | "USER";
+  message?: string; // MESSAGE entries
+  fromStatus?: ReportStatus; // STATUS_CHANGE entries
+  toStatus?: ReportStatus; // STATUS_CHANGE entries
+  createdAt: Date;
+}
+
 // Blocked user
 export interface BlockedUser {
   id: string;

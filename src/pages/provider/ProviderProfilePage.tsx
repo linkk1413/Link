@@ -21,6 +21,7 @@ import {
   Trash2,
   MapPin,
   CheckCircle2,
+  Flag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -884,6 +885,19 @@ const ProviderProfilePage: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <KeyRound className="h-5 w-5 text-muted-foreground" />
                     <span>{t("auth.resetPassword")}</span>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                </button>
+
+                {/* My complaints */}
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between border-b p-4 text-left"
+                  onClick={() => navigate("/provider/complaints")}
+                >
+                  <div className="flex items-center gap-3">
+                    <Flag className="h-5 w-5 text-muted-foreground" />
+                    <span>{t("complaints.title")}</span>
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground" />
                 </button>
