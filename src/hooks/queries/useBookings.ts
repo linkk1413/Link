@@ -1,5 +1,7 @@
 // React Query hooks for Bookings
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
 import {
   getBookings,
   getBookingById,
@@ -16,6 +18,8 @@ export const bookingKeys = {
     ["bookings", "provider", providerId] as const,
   byStatus: (status: BookingStatus) => ["bookings", "status", status] as const,
   detail: (id: string) => ["bookings", id] as const,
+  availableSlots: (providerId: string, dateKey: string, durationMin: number) =>
+    ["bookings", "availableSlots", providerId, dateKey, durationMin] as const,
 };
 
 // Fetch bookings for a client
@@ -62,6 +66,29 @@ export const useBooking = (id: string) => {
     queryKey: bookingKeys.detail(id),
     queryFn: () => getBookingById(id),
     enabled: !!id,
+  });
+};
+
+// Free "HH:mm" start times for a provider on a given local date, computed
+// server-side (getAvailableBookingSlots Cloud Function) since a browsing
+// client has no read access to other clients' booking documents.
+export const useAvailableSlots = (
+  providerId: string,
+  dateKey: string,
+  durationMin: number,
+) => {
+  return useQuery<string[], Error>({
+    queryKey: bookingKeys.availableSlots(providerId, dateKey, durationMin),
+    queryFn: async () => {
+      const call = httpsCallable<
+        { providerId: string; date: string; durationMin: number },
+        { slots: string[] }
+      >(functions, "getAvailableBookingSlots");
+      const result = await call({ providerId, date: dateKey, durationMin });
+      return result.data.slots;
+    },
+    enabled: !!providerId && !!dateKey && durationMin > 0,
+    staleTime: 0, // always re-check freshness before showing/confirming a slot
   });
 };
 

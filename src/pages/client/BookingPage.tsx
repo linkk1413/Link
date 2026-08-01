@@ -15,11 +15,12 @@ import {
 } from "@/components/ui/dialog";
 import { useService } from "@/hooks/queries/useServices";
 import { useProviderProfile } from "@/hooks/queries/useProviders";
-import { useCreateBooking } from "@/hooks/queries/useBookings";
+import { useCreateBooking, useAvailableSlots } from "@/hooks/queries/useBookings";
 import { useCreatePayment } from "@/hooks/queries/usePayments";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatServiceDuration } from "@/lib/duration";
 import { getSubscriptionSettings } from "@/lib/firestore";
+import { isProviderWorkingDay, toLocalDateKey } from "@/lib/availability";
 import MoyasarCheckout from "@/components/payments/MoyasarCheckout";
 import {
   finalizeMoyasarBooking,
@@ -27,20 +28,6 @@ import {
   type MoyasarBookingDraft,
 } from "@/lib/finalizeMoyasarBooking";
 import { toast } from "@/components/ui/sonner";
-
-// Generate time slots
-const generateTimeSlots = () => {
-  const slots: string[] = [];
-  for (let hour = 9; hour <= 20; hour++) {
-    slots.push(`${hour.toString().padStart(2, "0")}:00`);
-    if (hour < 20) {
-      slots.push(`${hour.toString().padStart(2, "0")}:30`);
-    }
-  }
-  return slots;
-};
-
-const TIME_SLOTS = generateTimeSlots();
 
 const BookingPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -68,17 +55,44 @@ const BookingPage: React.FC = () => {
     service?.providerId || "",
   );
 
+  // Free time slots for the selected day, computed server-side against the
+  // provider's real schedule + existing bookings (see useAvailableSlots).
+  const dateKey = selectedDate ? toLocalDateKey(selectedDate) : "";
+  const {
+    data: availableSlots = [],
+    isLoading: loadingSlots,
+    refetch: refetchAvailableSlots,
+  } = useAvailableSlots(
+    service?.providerId || "",
+    dateKey,
+    service?.durationMin || 0,
+  );
+
+  // Slots are date-specific — a time picked for a previous day can't carry over.
+  useEffect(() => {
+    setSelectedTime(null);
+  }, [dateKey]);
+
   const createBookingMutation = useCreateBooking();
   const createPaymentMutation = useCreatePayment();
   const handleBack = () => {
     navigate(-1);
   };
 
-  const handleConfirmBooking = () => {
+  const handleConfirmBooking = async () => {
     if (!selectedDate || !selectedTime || !selectedLocation) {
       toast.error(t("common.error"), {
         description: t("booking.validationError"),
       });
+      return;
+    }
+    // Best-effort re-check: someone else may have taken this slot since it
+    // was first fetched. Not a full atomic guarantee (Firestore rules don't
+    // let us validate this at write time), but it closes most of the gap.
+    const fresh = await refetchAvailableSlots();
+    if (!fresh.data?.includes(selectedTime)) {
+      setSelectedTime(null);
+      toast.error(t("booking.slotNoLongerAvailable"));
       return;
     }
     setBookingSuccess(false);
@@ -282,8 +296,11 @@ const BookingPage: React.FC = () => {
 
   const canProceed = selectedDate && selectedTime && selectedLocation;
 
-  // Disable past dates
-  const disabledDays = { before: new Date() };
+  // Disable past dates and days the provider doesn't work at all.
+  const disabledDays = [
+    { before: new Date() },
+    (date: Date) => !isProviderWorkingDay(date, provider?.availabilityRules),
+  ];
 
   if (loadingService || loadingProvider) {
     return (
@@ -366,21 +383,33 @@ const BookingPage: React.FC = () => {
               <h3 className="mb-4 font-semibold text-foreground">
                 {t("booking.selectTime")}
               </h3>
-              <div className="grid grid-cols-4 gap-2">
-                {TIME_SLOTS.map((slot) => (
-                  <button
-                    key={slot}
-                    onClick={() => setSelectedTime(slot)}
-                    className={`rounded-xl px-3 py-2 text-sm transition-all ${
-                      selectedTime === slot
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted hover:bg-accent"
-                    }`}
-                  >
-                    {slot}
-                  </button>
-                ))}
-              </div>
+              {loadingSlots ? (
+                <div className="grid grid-cols-4 gap-2">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                    <Skeleton key={i} className="h-9 w-full rounded-xl" />
+                  ))}
+                </div>
+              ) : availableSlots.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  {t("booking.noSlotsAvailable")}
+                </p>
+              ) : (
+                <div className="grid grid-cols-4 gap-2">
+                  {availableSlots.map((slot) => (
+                    <button
+                      key={slot}
+                      onClick={() => setSelectedTime(slot)}
+                      className={`rounded-xl px-3 py-2 text-sm transition-all ${
+                        selectedTime === slot
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted hover:bg-accent"
+                      }`}
+                    >
+                      {slot}
+                    </button>
+                  ))}
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -441,7 +470,7 @@ const BookingPage: React.FC = () => {
             className="w-full"
             size="lg"
             disabled={!canProceed}
-            onClick={() => setShowConfirmation(true)}
+            onClick={handleConfirmBooking}
           >
             {t("booking.confirmBooking")}
           </Button>

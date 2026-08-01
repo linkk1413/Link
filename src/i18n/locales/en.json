@@ -219,6 +219,8 @@
     "validationError": "Please select date, time, and location.",
     "selectDate": "Select date",
     "selectTime": "Select time",
+    "noSlotsAvailable": "No available time slots on this day.",
+    "slotNoLongerAvailable": "Sorry, this time slot was just taken. Please pick another one.",
     "selectService": "Select service",
     "bookingDetails": "Booking details",
     "confirmBooking": "Confirm booking",

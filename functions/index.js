@@ -354,6 +354,164 @@ exports.onBookingStatusChanged = onDocumentUpdated(
   },
 );
 
+// =====================
+// Booking availability
+// =====================
+
+const BLOCKING_BOOKING_STATUSES = new Set([
+  "PENDING",
+  "ACCEPTED",
+  "CONFIRMED",
+  "IN_PROGRESS",
+]);
+const DEFAULT_AVAILABILITY_WINDOW = { start: 9 * 60, end: 20 * 60 }; // 09:00-20:00 fallback
+const SLOT_INTERVAL_MIN = 30;
+
+const timeToMinutes = (hhmm) => {
+  const [h, m] = String(hhmm).split(":").map(Number);
+  return h * 60 + m;
+};
+
+const minutesToTime = (minutes) => {
+  const h = String(Math.floor(minutes / 60)).padStart(2, "0");
+  const m = String(minutes % 60).padStart(2, "0");
+  return `${h}:${m}`;
+};
+
+// Cuts `remove` out of every window in `windows`, splitting a window in two
+// if `remove` falls in its middle.
+const subtractInterval = (windows, remove) => {
+  const result = [];
+  for (const w of windows) {
+    if (remove.end <= w.start || remove.start >= w.end) {
+      result.push(w);
+      continue;
+    }
+    if (remove.start > w.start) {
+      result.push({ start: w.start, end: Math.min(remove.start, w.end) });
+    }
+    if (remove.end < w.end) {
+      result.push({ start: Math.max(remove.end, w.start), end: w.end });
+    }
+  }
+  return result.filter((w) => w.end > w.start);
+};
+
+// "YYYY-MM-DD" for a Date, in Saudi local time regardless of the server's
+// own execution timezone (Cloud Functions run in UTC).
+const riyadhDateKey = (date) =>
+  date.toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+
+const riyadhTimeMinutes = (date) =>
+  timeToMinutes(
+    date.toLocaleTimeString("en-GB", {
+      timeZone: "Asia/Riyadh",
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  );
+
+// Returns the free "HH:mm" start times for a provider on a given date,
+// intersecting their weekly availabilityRules, one-off availabilityExceptions,
+// and existing (non-cancelled) bookings. Runs server-side because a client
+// can't otherwise read other clients' booking documents to compute
+// conflicts — firestore.rules scopes bookings/{id} reads to that booking's
+// own client/provider/admin — this callable exposes only the resulting free
+// slot list, never any booking's client identity or other details.
+exports.getAvailableBookingSlots = onCall(async (request) => {
+  const { providerId, date, durationMin } = request.data || {};
+  const minutesNeeded = Number(durationMin);
+  if (
+    !providerId ||
+    typeof providerId !== "string" ||
+    !date ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+    !Number.isFinite(minutesNeeded) ||
+    minutesNeeded <= 0
+  ) {
+    throw new HttpsError("invalid-argument", "Missing or invalid parameters.");
+  }
+
+  const providerSnap = await db.collection("providers").doc(providerId).get();
+  const profile = providerSnap.exists ? providerSnap.data() : {};
+  const availabilityRules = Array.isArray(profile.availabilityRules)
+    ? profile.availabilityRules
+    : [];
+  const availabilityExceptions = Array.isArray(profile.availabilityExceptions)
+    ? profile.availabilityExceptions
+    : [];
+
+  const dayOfWeek = new Date(`${date}T12:00:00Z`).getUTCDay();
+
+  let windows;
+  if (availabilityRules.length > 0) {
+    const rule = availabilityRules.find((r) => r.dayOfWeek === dayOfWeek);
+    if (!rule) {
+      windows = []; // provider doesn't work this day at all
+    } else {
+      windows = [
+        { start: timeToMinutes(rule.startTime), end: timeToMinutes(rule.endTime) },
+      ];
+      if (rule.breakStart && rule.breakEnd) {
+        windows = subtractInterval(windows, {
+          start: timeToMinutes(rule.breakStart),
+          end: timeToMinutes(rule.breakEnd),
+        });
+      }
+    }
+  } else {
+    // No schedule configured yet — fall back to the old permissive default
+    // so a provider who never touched ProviderSchedulePage stays bookable.
+    windows = [{ ...DEFAULT_AVAILABILITY_WINDOW }];
+  }
+
+  for (const exception of availabilityExceptions) {
+    if (exception.date !== date) continue;
+    const exInterval = {
+      start: timeToMinutes(exception.startTime),
+      end: timeToMinutes(exception.endTime),
+    };
+    windows =
+      exception.type === "BLOCK"
+        ? subtractInterval(windows, exInterval)
+        : [...windows, exInterval];
+  }
+
+  const bookingsSnap = await db
+    .collection("bookings")
+    .where("providerId", "==", providerId)
+    .get();
+
+  for (const bookingDoc of bookingsSnap.docs) {
+    const booking = bookingDoc.data();
+    if (!BLOCKING_BOOKING_STATUSES.has(booking.status)) continue;
+    const startAt = booking.startAt?.toDate ? booking.startAt.toDate() : null;
+    const endAt = booking.endAt?.toDate ? booking.endAt.toDate() : null;
+    if (!startAt || !endAt) continue;
+    if (riyadhDateKey(startAt) !== date) continue;
+
+    windows = subtractInterval(windows, {
+      start: riyadhTimeMinutes(startAt),
+      end: riyadhTimeMinutes(endAt),
+    });
+  }
+
+  const now = new Date();
+  const isToday = riyadhDateKey(now) === date;
+  const nowMinutes = isToday ? riyadhTimeMinutes(now) : -1;
+
+  const slots = [];
+  for (const w of windows) {
+    for (let start = w.start; start + minutesNeeded <= w.end; start += SLOT_INTERVAL_MIN) {
+      if (isToday && start <= nowMinutes) continue;
+      slots.push(minutesToTime(start));
+    }
+  }
+  slots.sort();
+
+  return { slots };
+});
+
 // Recompute a provider's rating from real review documents whenever a review
 // is created, edited, or deleted. Runs with Admin SDK privileges so it's the
 // only path allowed to write providers/{id}.ratingAvg|ratingCount — clients

@@ -218,6 +218,8 @@
   "booking": {
     "selectDate": "اختاري التاريخ",
     "selectTime": "اختاري الوقت",
+    "noSlotsAvailable": "لا توجد أوقات متاحة بهذا اليوم.",
+    "slotNoLongerAvailable": "عذرًا، تم حجز هذا الوقت للتو. يرجى اختيار وقت آخر.",
     "selectService": "اختاري الخدمة",
     "bookingDetails": "تفاصيل الحجز",
     "confirmBooking": "تأكيد الحجز",
