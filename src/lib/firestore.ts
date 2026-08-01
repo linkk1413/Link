@@ -2230,20 +2230,22 @@ export const getReportsByReporter = async (
   reporterId: string,
 ): Promise<Report[]> => {
   const colRef = collection(db, COLLECTIONS.REPORTS);
-  const q = query(
-    colRef,
-    where("reporterId", "==", reporterId),
-    orderBy("createdAt", "desc"),
-  );
+  // where-only, sorted client-side — combining this filter with orderBy on a
+  // different field would need a composite index that isn't declared (same
+  // reasoning as getReports/getProviderReviewsForAdmin elsewhere in this file).
+  const q = query(colRef, where("reporterId", "==", reporterId));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => {
+  const reports = snapshot.docs.map((d) => {
     const data = d.data();
     return {
       id: d.id,
       ...data,
       createdAt: timestampToDate(data.createdAt),
+      updatedAt: data.updatedAt ? timestampToDate(data.updatedAt) : undefined,
+      resolvedAt: data.resolvedAt ? timestampToDate(data.resolvedAt) : undefined,
     } as Report;
   });
+  return reports.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 };
 
 // Statuses that represent the report being done with, as opposed to still
