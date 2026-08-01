@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { RoleSwitcher } from "@/components/RoleSwitcher";
+import { NotificationBell } from "@/components/NotificationBell";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGuest } from "@/contexts/GuestContext";
@@ -178,6 +179,7 @@ const ClientHomePage: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {!isGuest && <NotificationBell />}
             <RoleSwitcher />
             <LanguageSwitcher />
             {!isGuest && (

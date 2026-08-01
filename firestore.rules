@@ -305,6 +305,17 @@ service cloud.firestore {
       allow delete: if signedIn() && resource.data.clientId == request.auth.uid;
     }
 
+    // Always written server-side (Cloud Function triggers, Admin SDK) — a
+    // client can never write a notification, only read/mark-read/clear
+    // their own.
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if false;
+      allow update: if signedIn() && resource.data.userId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
     match /settings/{settingId} {
       allow read: if true;
       allow write: if isAdmin();

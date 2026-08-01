@@ -413,6 +413,26 @@ export interface Favorite {
   createdAt: Date;
 }
 
+// In-app notification — always written server-side (Cloud Function
+// triggers, Admin SDK), since a client has no permission to write a
+// notification for someone else's uid.
+export type NotificationType =
+  | "NEW_BOOKING"
+  | "BOOKING_STATUS"
+  | "NEW_MESSAGE"
+  | "COMPLAINT_REPLY";
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  body?: string;
+  link?: string; // in-app route to open when tapped
+  read: boolean;
+  createdAt: Date;
+}
+
 // Time slot for booking
 export interface TimeSlot {
   startTime: string; // "HH:mm"

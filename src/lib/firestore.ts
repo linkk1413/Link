@@ -45,6 +45,7 @@ import {
   BookingTimelineEntry,
   BlockedUser,
   Favorite,
+  AppNotification,
 } from "@/types";
 
 // Collection names
@@ -64,6 +65,7 @@ export const COLLECTIONS = {
   BLOCKED_USERS: "blockedUsers",
   VERIFICATIONS: "verifications",
   FAVORITES: "favorites",
+  NOTIFICATIONS: "notifications",
 } as const;
 
 // Convert Firestore timestamp to Date
@@ -2557,6 +2559,51 @@ export const isUserBlocked = async (
   );
   const snapshot = await getDocs(q);
   return !snapshot.empty;
+};
+
+// ==================== NOTIFICATIONS ====================
+// Always written server-side (see functions/index.js triggers) — the client
+// only ever reads, marks read, or deletes its own.
+
+export const subscribeToNotifications = (
+  userId: string,
+  callback: (notifications: AppNotification[]) => void,
+): (() => void) => {
+  const colRef = collection(db, COLLECTIONS.NOTIFICATIONS);
+  const q = query(colRef, where("userId", "==", userId));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const notifications = snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          createdAt: timestampToDate(data.createdAt),
+        } as AppNotification;
+      });
+      notifications.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      callback(notifications);
+    },
+    () => callback([]),
+  );
+};
+
+export const markNotificationRead = async (notificationId: string): Promise<void> => {
+  const docRef = doc(db, COLLECTIONS.NOTIFICATIONS, notificationId);
+  await updateDoc(docRef, { read: true });
+};
+
+export const markAllNotificationsRead = async (
+  notifications: AppNotification[],
+): Promise<void> => {
+  const unread = notifications.filter((n) => !n.read);
+  if (unread.length === 0) return;
+  const batch = writeBatch(db);
+  unread.forEach((n) => {
+    batch.update(doc(db, COLLECTIONS.NOTIFICATIONS, n.id), { read: true });
+  });
+  await batch.commit();
 };
 
 // ==================== FAVORITES ====================

@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { RoleSwitcher } from "@/components/RoleSwitcher";
+import { NotificationBell } from "@/components/NotificationBell";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 import {
@@ -255,6 +256,7 @@ const ProviderDashboardPage: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <NotificationBell />
             <RoleSwitcher />
             <LanguageSwitcher />
             <Button
