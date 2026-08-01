@@ -263,6 +263,10 @@
     "details": "Booking Details",
     "notFound": "Booking not found",
     "dateTime": "Date & Time",
+    "bookAgain": "Book again",
+    "timeline": "Order Timeline",
+    "timelineCreated": "Order created",
+    "timelineStatusChange": "Status changed to: {{status}}",
     "provider": "Service Provider",
     "messageProvider": "Message Provider",
     "messageClient": "Message Client",
@@ -1183,5 +1187,13 @@
     "messagePlaceholder": "Type your message...",
     "timelineCreated": "Complaint created",
     "timelineStatusChange": "Status changed to: {{status}}"
+  },
+  "favorites": {
+    "title": "Favorites",
+    "none": "No favorites yet",
+    "add": "Add to favorites",
+    "remove": "Remove from favorites",
+    "added": "Added to favorites",
+    "removed": "Removed from favorites"
   }
 }

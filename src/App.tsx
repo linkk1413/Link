@@ -38,6 +38,7 @@ import ClientBookingsPage from "@/pages/client/ClientBookingsPage";
 import ClientChatsPage from "@/pages/client/ClientChatsPage";
 import ClientChatRoomPage from "@/pages/client/ClientChatRoomPage";
 import ClientProfilePage from "@/pages/client/ClientProfilePage";
+import ClientFavoritesPage from "@/pages/client/ClientFavoritesPage";
 import ProviderViewPage from "@/pages/client/ProviderProfilePage";
 import BookingPage from "@/pages/client/BookingPage";
 import BookingDetailsPage from "@/pages/client/BookingDetailsPage";
@@ -161,6 +162,7 @@ const AppRoutes = () => {
         <Route path="chats/:chatId" element={<ClientChatRoomPage />} />
         <Route path="complaints" element={<MyComplaintsPage />} />
         <Route path="complaints/:id" element={<ComplaintDetailPage />} />
+        <Route path="favorites" element={<ClientFavoritesPage />} />
         <Route path="profile" element={<ClientProfilePage />} />
         <Route path="provider/:id" element={<ProviderViewPage />} />
         <Route path="book/:serviceId" element={<BookingPage />} />

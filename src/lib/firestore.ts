@@ -32,6 +32,7 @@ import {
   ProviderProfile,
   Booking,
   BookingStatus,
+  BookingTimelineEntry,
   Review,
   Payment,
   BannerSettings,
@@ -41,7 +42,9 @@ import {
   ReportTargetType,
   ReportInternalNote,
   ReportActivityEntry,
+  BookingTimelineEntry,
   BlockedUser,
+  Favorite,
 } from "@/types";
 
 // Collection names
@@ -60,6 +63,7 @@ export const COLLECTIONS = {
   REPORTS: "reports",
   BLOCKED_USERS: "blockedUsers",
   VERIFICATIONS: "verifications",
+  FAVORITES: "favorites",
 } as const;
 
 // Convert Firestore timestamp to Date
@@ -1560,19 +1564,81 @@ export const createBooking = async (
   };
 
   const docRef = await addDoc(bookingsRef, bookingData);
+
+  // Best-effort: the booking itself already exists even if this fails.
+  try {
+    await addBookingTimelineEntry(docRef.id, { type: "CREATED", actorRole: "CLIENT" });
+  } catch (err) {
+    console.warn("Failed to log booking creation timeline entry:", err);
+  }
+
   return docRef.id;
 };
 
 export const updateBookingStatus = async (
   id: string,
   status: BookingStatus,
+  actorRole?: "CLIENT" | "PROVIDER" | "ADMIN",
 ): Promise<void> => {
   const bookingRef = doc(db, COLLECTIONS.BOOKINGS, id);
+  const currentSnap = await getDoc(bookingRef);
+  const fromStatus = currentSnap.exists()
+    ? (currentSnap.data().status as BookingStatus)
+    : undefined;
 
   await updateDoc(bookingRef, {
     status,
     updatedAt: serverTimestamp(),
   });
+
+  if (fromStatus !== status) {
+    try {
+      await addBookingTimelineEntry(id, {
+        type: "STATUS_CHANGE",
+        actorRole,
+        fromStatus,
+        toStatus: status,
+      });
+    } catch (err) {
+      console.warn("Failed to log booking status change timeline entry:", err);
+    }
+  }
+};
+
+export const addBookingTimelineEntry = async (
+  bookingId: string,
+  entry: Omit<BookingTimelineEntry, "id" | "createdAt">,
+): Promise<string> => {
+  const colRef = collection(db, COLLECTIONS.BOOKINGS, bookingId, "timeline");
+  const docRef = await addDoc(colRef, stripUndefinedFields({
+    ...entry,
+    createdAt: serverTimestamp(),
+  }));
+  return docRef.id;
+};
+
+export const subscribeToBookingTimeline = (
+  bookingId: string,
+  callback: (entries: BookingTimelineEntry[]) => void,
+): (() => void) => {
+  const colRef = collection(db, COLLECTIONS.BOOKINGS, bookingId, "timeline");
+  const q = query(colRef, orderBy("createdAt", "asc"));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      callback(
+        snapshot.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...data,
+            createdAt: timestampToDate(data.createdAt),
+          } as BookingTimelineEntry;
+        }),
+      );
+    },
+    () => callback([]),
+  );
 };
 
 // The "Trusted Provider" blue-checkmark badge (providers.isVerified) is now
@@ -2487,6 +2553,74 @@ export const isUserBlocked = async (
     colRef,
     where("blockerId", "==", blockerId),
     where("blockedUserId", "==", blockedUserId),
+    limit(1),
+  );
+  const snapshot = await getDocs(q);
+  return !snapshot.empty;
+};
+
+// ==================== FAVORITES ====================
+
+export const addFavorite = async (
+  clientId: string,
+  providerId: string,
+  providerName?: string,
+): Promise<string> => {
+  const colRef = collection(db, COLLECTIONS.FAVORITES);
+  const docRef = await addDoc(
+    colRef,
+    stripUndefinedFields({
+      clientId,
+      providerId,
+      providerName,
+      createdAt: serverTimestamp(),
+    }),
+  );
+  return docRef.id;
+};
+
+export const removeFavorite = async (
+  clientId: string,
+  providerId: string,
+): Promise<void> => {
+  const colRef = collection(db, COLLECTIONS.FAVORITES);
+  const q = query(
+    colRef,
+    where("clientId", "==", clientId),
+    where("providerId", "==", providerId),
+  );
+  const snapshot = await getDocs(q);
+  const batch = writeBatch(db);
+  snapshot.docs.forEach((d) => batch.delete(d.ref));
+  await batch.commit();
+};
+
+// where-only, sorted client-side — see getReports/getReportsByReporter for
+// why this avoids a where+orderBy composite index that isn't declared.
+export const getFavorites = async (clientId: string): Promise<Favorite[]> => {
+  const colRef = collection(db, COLLECTIONS.FAVORITES);
+  const q = query(colRef, where("clientId", "==", clientId));
+  const snapshot = await getDocs(q);
+  const favorites = snapshot.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      ...data,
+      createdAt: timestampToDate(data.createdAt),
+    } as Favorite;
+  });
+  return favorites.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+};
+
+export const isProviderFavorited = async (
+  clientId: string,
+  providerId: string,
+): Promise<boolean> => {
+  const colRef = collection(db, COLLECTIONS.FAVORITES);
+  const q = query(
+    colRef,
+    where("clientId", "==", clientId),
+    where("providerId", "==", providerId),
     limit(1),
   );
   const snapshot = await getDocs(q);

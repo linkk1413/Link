@@ -262,6 +262,10 @@
     "details": "تفاصيل الحجز",
     "notFound": "لم يتم العثور على الحجز",
     "dateTime": "التاريخ والوقت",
+    "bookAgain": "احجزي مرة أخرى",
+    "timeline": "السجل الزمني للطلب",
+    "timelineCreated": "تم إنشاء الطلب",
+    "timelineStatusChange": "تغيّرت الحالة إلى: {{status}}",
     "provider": "مقدمة الخدمة",
     "messageProvider": "مراسلة مقدمة الخدمة",
     "messageClient": "مراسلة العميلة",
@@ -1183,5 +1187,13 @@
     "messagePlaceholder": "اكتبي رسالتك هنا...",
     "timelineCreated": "تم إنشاء الشكوى",
     "timelineStatusChange": "تم تغيير الحالة إلى: {{status}}"
+  },
+  "favorites": {
+    "title": "المفضلة",
+    "none": "لا توجد مفضلات بعد",
+    "add": "إضافة إلى المفضلة",
+    "remove": "إزالة من المفضلة",
+    "added": "تمت الإضافة إلى المفضلة",
+    "removed": "تمت الإزالة من المفضلة"
   }
 }

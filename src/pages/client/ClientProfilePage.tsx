@@ -15,6 +15,7 @@ import {
   Trash2,
   MapPin,
   Flag,
+  Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -541,6 +542,19 @@ const ClientProfilePage: React.FC = () => {
             </h3>
             <Card>
               <CardContent className="p-0">
+                {!isGuest && (
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between border-b p-4 text-start transition-colors hover:bg-accent"
+                    onClick={() => navigate("/client/favorites")}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Heart className="h-5 w-5 text-muted-foreground" />
+                      <span>{t("favorites.title")}</span>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </button>
+                )}
                 {!isGuest && (
                   <button
                     type="button"

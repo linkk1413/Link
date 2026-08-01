@@ -1,4 +1,5 @@
 // React Query hooks for Bookings
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
@@ -7,8 +8,9 @@ import {
   getBookingById,
   createBooking,
   updateBookingStatus,
+  subscribeToBookingTimeline,
 } from "@/lib/firestore";
-import { Booking, BookingStatus } from "@/types";
+import { Booking, BookingStatus, BookingTimelineEntry } from "@/types";
 
 // Query keys for cache management
 export const bookingKeys = {
@@ -116,8 +118,15 @@ export const useUpdateBookingStatus = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: BookingStatus }) =>
-      updateBookingStatus(id, status),
+    mutationFn: ({
+      id,
+      status,
+      actorRole,
+    }: {
+      id: string;
+      status: BookingStatus;
+      actorRole?: "CLIENT" | "PROVIDER" | "ADMIN";
+    }) => updateBookingStatus(id, status, actorRole),
     onSuccess: (_, variables) => {
       // Invalidate the specific booking and all lists
       queryClient.invalidateQueries({
@@ -126,6 +135,28 @@ export const useUpdateBookingStatus = () => {
       queryClient.invalidateQueries({ queryKey: bookingKeys.all });
     },
   });
+};
+
+// Live status timeline for a booking (created + every status change).
+export const useBookingTimelineLive = (bookingId: string) => {
+  const [entries, setEntries] = useState<BookingTimelineEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!bookingId) {
+      setEntries([]);
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    const unsubscribe = subscribeToBookingTimeline(bookingId, (data) => {
+      setEntries(data);
+      setIsLoading(false);
+    });
+    return () => unsubscribe();
+  }, [bookingId]);
+
+  return { data: entries, isLoading };
 };
 
 // Helper hook to get booking status actions

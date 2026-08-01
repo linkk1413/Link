@@ -137,6 +137,7 @@ const ProviderDashboardPage: React.FC = () => {
         await updateStatusMutation.mutateAsync({
           id: selectedBooking.id,
           status: "ACCEPTED",
+          actorRole: "PROVIDER",
         });
       } else {
         // Reject: return the client's money, then mark the booking rejected.
@@ -145,6 +146,7 @@ const ProviderDashboardPage: React.FC = () => {
         await updateStatusMutation.mutateAsync({
           id: selectedBooking.id,
           status: "REJECTED",
+          actorRole: "PROVIDER",
         });
         if ((isCaptured || isHold) && payment) {
           const endpoint = isCaptured ? "refund" : "void";

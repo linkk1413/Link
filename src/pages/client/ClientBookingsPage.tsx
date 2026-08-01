@@ -2,8 +2,9 @@ import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
-import { Calendar, Clock, MapPin, ChevronRight } from "lucide-react";
+import { Calendar, Clock, MapPin, ChevronRight, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
@@ -181,6 +182,22 @@ const ClientBookingsPage: React.FC = () => {
                 <MapPin className="h-4 w-4" />
                 <span className="truncate">{booking.addressText}</span>
               </div>
+            )}
+
+            {/* Rebook — completed orders only, and only if the service still exists */}
+            {booking.status === "COMPLETED" && service && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 gap-1.5"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/client/book/${service.id}`);
+                }}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                {t("bookings.bookAgain")}
+              </Button>
             )}
           </div>
 

@@ -146,6 +146,25 @@ service cloud.firestore {
         isAdmin()
       );
       allow delete: if isAdmin();
+
+      // Status timeline — same read audience as the booking itself; only
+      // the client/provider on this exact booking (or admin/server) may
+      // append to it, and it's append-only (no edits).
+      match /timeline/{entryId} {
+        allow read: if signedIn() && (
+          bookingDoc(bookingId).data.clientId == request.auth.uid ||
+          bookingDoc(bookingId).data.providerId == request.auth.uid ||
+          isAdmin()
+        );
+        allow create: if isAdmin() || (
+          signedIn() && (
+            bookingDoc(bookingId).data.clientId == request.auth.uid ||
+            bookingDoc(bookingId).data.providerId == request.auth.uid
+          )
+        );
+        allow update: if false;
+        allow delete: if isAdmin();
+      }
     }
 
     match /payments/{paymentId} {
@@ -275,6 +294,15 @@ service cloud.firestore {
       );
       allow create: if signedIn() && request.resource.data.blockerId == request.auth.uid;
       allow delete: if signedIn() && resource.data.blockerId == request.auth.uid;
+    }
+
+    match /favorites/{favoriteId} {
+      allow read: if signedIn() && (
+        resource.data.clientId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if signedIn() && request.resource.data.clientId == request.auth.uid;
+      allow delete: if signedIn() && resource.data.clientId == request.auth.uid;
     }
 
     match /settings/{settingId} {

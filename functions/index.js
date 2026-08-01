@@ -244,6 +244,14 @@ exports.autoRejectExpiredBookings = onSchedule(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
+      await doc.ref.collection("timeline").add({
+        type: "STATUS_CHANGE",
+        actorRole: "SYSTEM",
+        fromStatus: "PENDING",
+        toStatus: "REJECTED",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
       const [client, providerUser, service] = await Promise.all([
         getUserById(booking.clientId),
         getUserById(booking.providerId),

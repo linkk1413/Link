@@ -107,6 +107,7 @@ const ProviderBookingDetailsPage: React.FC = () => {
       await updateStatusMutation.mutateAsync({
         id: booking.id,
         status,
+        actorRole: "PROVIDER",
       });
       setDialogType(null);
     } catch (error) {

@@ -13,6 +13,7 @@ import {
   XCircle,
   Star,
   Edit3,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +35,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   useBooking,
   useUpdateBookingStatus,
+  useBookingTimelineLive,
 } from "@/hooks/queries/useBookings";
 import { useService } from "@/hooks/queries/useServices";
 import { useProviderProfile } from "@/hooks/queries/useProviders";
@@ -87,6 +89,7 @@ const BookingDetailsPage: React.FC = () => {
 
   const createChatMutation = useCreateChat();
   const updateStatusMutation = useUpdateBookingStatus();
+  const { data: timeline = [] } = useBookingTimelineLive(bookingId || "");
 
   // Check if booking is completed and can be reviewed
   const isCompleted = booking?.status === "COMPLETED";
@@ -120,6 +123,7 @@ const BookingDetailsPage: React.FC = () => {
       await updateStatusMutation.mutateAsync({
         id: booking.id,
         status: "CANCELLED_BY_CLIENT",
+        actorRole: "CLIENT",
       });
     } catch (error) {
       console.error("Failed to cancel booking:", error);
@@ -306,6 +310,56 @@ const BookingDetailsPage: React.FC = () => {
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* Timeline */}
+        {timeline.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <History className="h-5 w-5 text-muted-foreground" />
+                  {t("bookings.timeline")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {timeline.map((entry, index) => (
+                    <div key={entry.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-primary" />
+                        {index < timeline.length - 1 && (
+                          <div className="w-px flex-1 bg-border" />
+                        )}
+                      </div>
+                      <div className="pb-4">
+                        <p className="text-sm text-foreground">
+                          {entry.type === "CREATED"
+                            ? t("bookings.timelineCreated")
+                            : t("bookings.timelineStatusChange", {
+                                status: t(`bookingStatus.${entry.toStatus}`),
+                              })}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Intl.DateTimeFormat(isArabic ? "ar-SA" : "en-US", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }).format(entry.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Review Section - Only for completed bookings */}
         {isCompleted && (

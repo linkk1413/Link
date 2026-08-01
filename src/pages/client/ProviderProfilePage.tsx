@@ -16,6 +16,7 @@ import {
   MoreVertical,
   Edit,
   Reply,
+  Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,11 @@ import {
   useUnblockUser,
   useIsUserBlocked,
 } from "@/hooks/queries/useBlocks";
+import {
+  useIsFavorited,
+  useAddFavorite,
+  useRemoveFavorite,
+} from "@/hooks/queries/useFavorites";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRequestTrackingConsent } from "@/components/TrackingConsent";
 import {
@@ -102,6 +108,9 @@ const ProviderProfilePage: React.FC = () => {
   const blockUserMutation = useBlockUser();
   const unblockUserMutation = useUnblockUser();
   const { data: isBlocked } = useIsUserBlocked(user?.uid || "", id || "");
+  const { data: isFavorited } = useIsFavorited(user?.uid || "", id || "");
+  const addFavoriteMutation = useAddFavorite();
+  const removeFavoriteMutation = useRemoveFavorite();
 
   const handleBack = () => {
     navigate(-1);
@@ -124,6 +133,25 @@ const ProviderProfilePage: React.FC = () => {
       navigate(`/client/chats/${chatId}`);
     } catch (error) {
       console.error("Failed to create chat:", error);
+    }
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!user || !id) return;
+    try {
+      if (isFavorited) {
+        await removeFavoriteMutation.mutateAsync({ clientId: user.uid, providerId: id });
+        toast.success(t("favorites.removed"));
+      } else {
+        await addFavoriteMutation.mutateAsync({
+          clientId: user.uid,
+          providerId: id,
+          providerName: provider?.displayName,
+        });
+        toast.success(t("favorites.added"));
+      }
+    } catch (error) {
+      toast.error(t("common.error"));
     }
   };
 
@@ -181,6 +209,18 @@ const ProviderProfilePage: React.FC = () => {
           <h1 className="text-lg font-semibold flex-1">
             {t("provider.profile")}
           </h1>
+          {user && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleToggleFavorite}
+              aria-label={t(isFavorited ? "favorites.remove" : "favorites.add")}
+            >
+              <Heart
+                className={`h-5 w-5 ${isFavorited ? "fill-destructive text-destructive" : ""}`}
+              />
+            </Button>
+          )}
           {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

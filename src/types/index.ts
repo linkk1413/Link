@@ -231,6 +231,18 @@ export interface Booking {
   updatedAt: Date;
 }
 
+// One entry in a booking's status timeline (bookings/{id}/timeline) — lets
+// the client/provider see exactly what happened and when: created, each
+// status change (who did it), including the automatic 24h expiry.
+export interface BookingTimelineEntry {
+  id: string;
+  type: "CREATED" | "STATUS_CHANGE";
+  actorRole?: "CLIENT" | "PROVIDER" | "ADMIN" | "SYSTEM";
+  fromStatus?: BookingStatus;
+  toStatus?: BookingStatus;
+  createdAt: Date;
+}
+
 // Payment
 export interface Payment {
   id: string;
@@ -389,6 +401,15 @@ export interface BlockedUser {
   id: string;
   blockerId: string; // user who initiated the block
   blockedUserId: string; // user who is blocked
+  createdAt: Date;
+}
+
+// A client's saved provider
+export interface Favorite {
+  id: string;
+  clientId: string;
+  providerId: string;
+  providerName?: string; // snapshot, for display without an extra lookup
   createdAt: Date;
 }
 
