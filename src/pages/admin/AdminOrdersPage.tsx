@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import { Search, ClipboardList } from "lucide-react";
@@ -52,7 +53,8 @@ const AdminOrdersPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
   const [statusFilter, setStatusFilter] = useState<BookingStatus | "ALL">(
     "ALL",
   );

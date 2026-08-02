@@ -626,6 +626,8 @@
     "tabOverview": "Overview",
     "tabReviews": "Reviews",
     "tabChats": "Conversations",
+    "globalSearchPlaceholder": "Search users, orders, complaints...",
+    "globalSearchNoResults": "No results found",
     "ordersManagement": "Orders",
     "ordersDescription": "View and search every order on the platform",
     "searchOrders": "Search by client, provider, or order id...",

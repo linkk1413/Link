@@ -21,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getAdminAlertCounts } from "@/lib/firestore";
+import { AdminGlobalSearch } from "@/components/admin/AdminGlobalSearch";
 
 const adminNavItems = [
   {
@@ -99,6 +100,7 @@ export const AdminLayout: React.FC = () => {
           {t("common.appName")} {t("admin.title")}
         </h1>
         <div className="flex items-center gap-2">
+          <AdminGlobalSearch />
           <LanguageSwitcher />
           <Button
             variant="ghost"
@@ -197,6 +199,9 @@ export const AdminLayout: React.FC = () => {
               {t("common.appName")} {t("admin.title")}
             </h1>
             <LanguageSwitcher />
+          </div>
+          <div className="p-4 pb-0">
+            <AdminGlobalSearch className="w-full justify-start" />
           </div>
           <nav className="flex-1 space-y-1 p-4">
             {adminNavItems.map((item) => (

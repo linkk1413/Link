@@ -626,6 +626,8 @@
     "tabOverview": "نظرة عامة",
     "tabReviews": "التقييمات",
     "tabChats": "المحادثات",
+    "globalSearchPlaceholder": "بحث بالمستخدمين، الطلبات، الشكاوى...",
+    "globalSearchNoResults": "لا توجد نتائج",
     "ordersManagement": "الطلبات",
     "ordersDescription": "عرض والبحث في جميع الطلبات بالمنصة",
     "searchOrders": "البحث باسم العميل أو مقدمة الخدمة أو رقم الطلب...",
