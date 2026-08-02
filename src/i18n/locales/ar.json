@@ -283,6 +283,15 @@
   "chat": {
     "typeMessage": "اكتبي رسالة...",
     "send": "إرسال",
+    "quickReplies": {
+      "greeting": "مرحبًا، شكرًا لتواصلك معنا",
+      "available": "سأكون متاحة خلال دقائق",
+      "slotAvailable": "نعم، هذا الموعد متاح",
+      "slotUnavailable": "عذرًا، هذا الموعد غير متاح، هل يناسبك وقت آخر؟",
+      "requestReceived": "تم استلام طلبك وسأقوم بتأكيده قريبًا",
+      "onMyWay": "أنا في الطريق، أراك قريبًا",
+      "thankYou": "شكرًا لك، أراك قريبًا"
+    },
     "noChats": "لا توجد محادثات بعد",
     "startChat": "ابدئي محادثة بحجز خدمة",
     "yesterday": "أمس",
@@ -551,7 +560,17 @@
     "startTime": "وقت البدء",
     "endTime": "وقت الانتهاء",
     "bookingsFor": "الحجوزات في",
-    "noBookings": "لا توجد حجوزات في هذا اليوم"
+    "noBookings": "لا توجد حجوزات في هذا اليوم",
+    "exceptions": "الأيام الاستثنائية",
+    "addException": "إضافة استثناء",
+    "noExceptions": "لا توجد استثناءات",
+    "exceptionDate": "التاريخ",
+    "exceptionType": "النوع",
+    "blockedDay": "غير متاحة",
+    "extraDay": "إتاحة إضافية",
+    "blockedDayHint": "لن تكوني متاحة للحجز خلال هذا الوقت بهذا التاريخ، حتى لو كان يوم عمل معتاد.",
+    "extraDayHint": "ستكونين متاحة للحجز خلال هذا الوقت الإضافي بهذا التاريخ، حتى لو كان يوم إجازة معتاد.",
+    "exceptionTimeOrderError": "يجب أن يكون وقت الانتهاء بعد وقت البدء."
   },
   "landing": {
     "heroTitle": "وصلتك الموثوقة إلى",
@@ -860,6 +879,8 @@
     "noRequests": "لا توجد طلبات حجز بعد",
     "requestsWillAppear": "ستظهر طلبات الحجز الجديدة هنا",
     "upcomingBookings": "القادمة",
+    "todaysSchedule": "جدول اليوم",
+    "newBookingAlert": "طلب حجز جديد!",
     "noUpcomingBookings": "لا توجد حجوزات قادمة",
     "acceptedBookingsAppear": "ستظهر الحجوزات المقبولة هنا",
     "accept": "قبول",

@@ -284,6 +284,15 @@
   "chat": {
     "typeMessage": "Type a message...",
     "send": "Send",
+    "quickReplies": {
+      "greeting": "Hello, thanks for reaching out!",
+      "available": "I'll be available in a few minutes",
+      "slotAvailable": "Yes, that time slot is available",
+      "slotUnavailable": "Sorry, that time isn't available — does another time work?",
+      "requestReceived": "Got your request, I'll confirm shortly",
+      "onMyWay": "On my way, see you soon",
+      "thankYou": "Thank you, see you soon"
+    },
     "noChats": "No conversations yet",
     "startChat": "Start a conversation by booking a service",
     "yesterday": "Yesterday",
@@ -551,7 +560,17 @@
     "startTime": "Start time",
     "endTime": "End time",
     "bookingsFor": "Bookings for",
-    "noBookings": "No bookings on this day"
+    "noBookings": "No bookings on this day",
+    "exceptions": "Exceptions",
+    "addException": "Add exception",
+    "noExceptions": "No exceptions set",
+    "exceptionDate": "Date",
+    "exceptionType": "Type",
+    "blockedDay": "Blocked",
+    "extraDay": "Extra availability",
+    "blockedDayHint": "You won't be bookable during this time on this date, even if it's normally a working day.",
+    "extraDayHint": "You'll be bookable during this extra time on this date, even if it's normally a day off.",
+    "exceptionTimeOrderError": "End time must be after start time."
   },
   "landing": {
     "heroTitle": "Your trusted connection to",
@@ -860,6 +879,8 @@
     "noRequests": "No booking requests yet",
     "requestsWillAppear": "New booking requests will appear here",
     "upcomingBookings": "Upcoming",
+    "todaysSchedule": "Today's Schedule",
+    "newBookingAlert": "New booking request!",
     "noUpcomingBookings": "No upcoming bookings",
     "acceptedBookingsAppear": "Accepted bookings will appear here",
     "accept": "Accept",

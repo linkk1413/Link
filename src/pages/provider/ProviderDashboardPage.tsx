@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -66,6 +66,43 @@ const ProviderDashboardPage: React.FC = () => {
     user?.uid || "",
   );
 
+  // Alert (toast + short beep) when a new booking request arrives while this
+  // page is open — the 24h auto-reject window makes catching this fast worth
+  // more than a silent badge. Skipped on first load (that's not "new").
+  const knownPendingIds = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const currentIds = new Set(pendingBookings.map((b) => b.id));
+    if (knownPendingIds.current === null) {
+      knownPendingIds.current = currentIds;
+      return;
+    }
+    const newOnes = pendingBookings.filter((b) => !knownPendingIds.current!.has(b.id));
+    knownPendingIds.current = currentIds;
+    if (newOnes.length === 0) return;
+
+    newOnes.forEach((booking) => {
+      toast.success(t("dashboard.newBookingAlert"), {
+        description: booking.serviceName || undefined,
+      });
+    });
+
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtx();
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.frequency.value = 880;
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      oscillator.start();
+      oscillator.stop(ctx.currentTime + 0.4);
+    } catch (err) {
+      // Audio isn't critical — the toast already carries the alert.
+    }
+  }, [pendingBookings, t]);
+
   // Fetch all bookings and filter for upcoming (accepted/confirmed)
   const { data: allBookings = [] } = useProviderBookings(user?.uid || "");
   const upcomingBookings = allBookings
@@ -77,6 +114,20 @@ const ProviderDashboardPage: React.FC = () => {
     .sort(
       (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
     );
+
+  // Confirmed appointments happening today, for the at-a-glance schedule card.
+  const todaysBookings = allBookings
+    .filter((b) => {
+      if (!["ACCEPTED", "CONFIRMED", "IN_PROGRESS"].includes(b.status)) return false;
+      const start = new Date(b.startAt);
+      const now = new Date();
+      return (
+        start.getFullYear() === now.getFullYear() &&
+        start.getMonth() === now.getMonth() &&
+        start.getDate() === now.getDate()
+      );
+    })
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
 
   const updateStatusMutation = useUpdateBookingStatus();
 
@@ -441,6 +492,38 @@ const ProviderDashboardPage: React.FC = () => {
               </Button>
             </div>
           </motion.section>
+
+          {/* Today's Schedule */}
+          {todaysBookings.length > 0 && (
+            <motion.section variants={fadeInUp} className="mb-6">
+              <h2 className="mb-3 font-medium text-foreground">
+                {t("dashboard.todaysSchedule")}
+              </h2>
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {todaysBookings.map((booking) => (
+                  <button
+                    key={booking.id}
+                    onClick={() => navigate(`/provider/booking/${booking.id}`)}
+                    className="flex min-w-[220px] shrink-0 flex-col gap-1 rounded-2xl bg-card p-4 text-start transition-colors hover:bg-accent"
+                  >
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-primary">
+                      <Clock className="h-4 w-4" />
+                      {new Date(booking.startAt).toLocaleTimeString(
+                        isArabic ? "ar-SA" : "en-US",
+                        { hour: "2-digit", minute: "2-digit" },
+                      )}
+                    </span>
+                    <span className="truncate font-medium text-foreground">
+                      {booking.serviceName || t("bookings.unknownService")}
+                    </span>
+                    <span className="truncate text-sm text-muted-foreground">
+                      {booking.clientName}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </motion.section>
+          )}
 
           {/* Bookings Section with Tabs */}
           <motion.section variants={fadeInUp}>

@@ -42,6 +42,25 @@ const sendEmail = async ({ to, subject, html, text }) => {
   });
 };
 
+// In-app notification — Firestore rejects `undefined` field values, so
+// body/link are always normalized to null rather than left out.
+const createNotification = async (userId, type, title, body, link) => {
+  if (!userId) return;
+  try {
+    await db.collection("notifications").add({
+      userId,
+      type,
+      title,
+      body: body || null,
+      link: link || null,
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.error("Failed to create notification:", err);
+  }
+};
+
 const getUserById = async (uid) => {
   if (!uid) return null;
   const snap = await db.collection("users").doc(uid).get();
@@ -204,6 +223,14 @@ exports.onBookingCreated = onDocumentCreated(
         `,
       });
     }
+
+    await createNotification(
+      booking.providerId,
+      "NEW_BOOKING",
+      "طلب حجز جديد",
+      service?.title ? `الخدمة: ${service.title}` : undefined,
+      `/provider/booking/${event.params.bookingId}`,
+    );
   },
 );
 
@@ -311,6 +338,25 @@ exports.onBookingStatusChanged = onDocumentUpdated(
     const oldStatus = beforeData.status;
     const newStatus = afterData.status;
 
+    // Notify the client on any meaningful status change, independent of the
+    // REJECTED-specific refund handling below.
+    const NOTIFY_STATUS_LABELS = {
+      ACCEPTED: "تم قبول طلبك",
+      CONFIRMED: "تم تأكيد طلبك",
+      IN_PROGRESS: "جاري تنفيذ طلبك",
+      COMPLETED: "تم إكمال طلبك",
+      REJECTED: "تم رفض طلبك",
+    };
+    if (oldStatus !== newStatus && NOTIFY_STATUS_LABELS[newStatus]) {
+      await createNotification(
+        afterData.clientId,
+        "BOOKING_STATUS",
+        NOTIFY_STATUS_LABELS[newStatus],
+        afterData.serviceName ? `الخدمة: ${afterData.serviceName}` : undefined,
+        `/client/bookings/${bookingId}`,
+      );
+    }
+
     // Only process if status changed TO REJECTED (and wasn't already rejected)
     if (newStatus !== "REJECTED" || oldStatus === "REJECTED") {
       return;
@@ -359,6 +405,58 @@ exports.onBookingStatusChanged = onDocumentUpdated(
         `,
       });
     }
+  },
+);
+
+// Notify the other side of a chat whenever a message is sent.
+exports.onMessageCreated = onDocumentCreated(
+  "chats/{chatId}/messages/{messageId}",
+  async (event) => {
+    const message = event.data?.data();
+    if (!message) return;
+
+    const chatId = event.params.chatId;
+    const chatSnap = await db.collection("chats").doc(chatId).get();
+    if (!chatSnap.exists) return;
+    const chat = chatSnap.data();
+
+    const recipientIsClient = message.senderId !== chat.clientId;
+    const recipientId = recipientIsClient ? chat.clientId : chat.providerId;
+    const senderName = recipientIsClient ? chat.providerName : chat.clientName;
+    const link = recipientIsClient ? `/client/chats/${chatId}` : `/provider/chats/${chatId}`;
+
+    await createNotification(
+      recipientId,
+      "NEW_MESSAGE",
+      `رسالة جديدة من ${senderName || "مستخدم"}`,
+      message.type === "IMAGE" ? "📷 صورة" : message.text,
+      link,
+    );
+  },
+);
+
+// Notify the complainant whenever an admin replies on their complaint.
+exports.onReportActivityCreated = onDocumentCreated(
+  "reports/{reportId}/activity/{entryId}",
+  async (event) => {
+    const entry = event.data?.data();
+    if (!entry || entry.type !== "MESSAGE" || entry.actorRole !== "ADMIN") return;
+
+    const reportSnap = await db.collection("reports").doc(event.params.reportId).get();
+    if (!reportSnap.exists) return;
+    const report = reportSnap.data();
+    if (!report.reporterId) return;
+
+    const reporterUser = await getUserById(report.reporterId);
+    const prefix = reporterUser?.activeRole === "PROVIDER" ? "/provider" : "/client";
+
+    await createNotification(
+      report.reporterId,
+      "COMPLAINT_REPLY",
+      "رد جديد على شكواك",
+      entry.message,
+      `${prefix}/complaints/${event.params.reportId}`,
+    );
   },
 );
 

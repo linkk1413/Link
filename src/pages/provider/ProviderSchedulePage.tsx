@@ -9,6 +9,7 @@ import {
   Clock,
   Save,
   X,
+  CalendarOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +37,7 @@ import {
   useUpdateProviderProfile,
 } from "@/hooks/queries/useProviders";
 import { toast } from "@/components/ui/sonner";
-import { AvailabilityRule } from "@/types";
+import { AvailabilityRule, AvailabilityException } from "@/types";
 
 const DEFAULT_WEEKLY_SCHEDULE: Record<number, AvailabilityRule | null> = {
   0: null, // Sunday - off
@@ -85,6 +86,13 @@ const TIME_SLOTS = Array.from({ length: 48 }, (_, i) => {
   return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
 });
 
+const toDateKey = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
 const ProviderSchedulePage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
@@ -110,7 +118,20 @@ const ProviderSchedulePage: React.FC = () => {
     if (!providerProfile || hydratedRef.current) return;
     hydratedRef.current = true;
     setWeeklySchedule(rulesToWeeklySchedule(providerProfile.availabilityRules));
+    setExceptions(providerProfile.availabilityExceptions || []);
   }, [providerProfile]);
+
+  // One-off date overrides (vacation days / extra availability) — persisted
+  // on providers/{uid}.availabilityExceptions and consulted by the
+  // getAvailableBookingSlots Cloud Function when a client books.
+  const [exceptions, setExceptions] = useState<AvailabilityException[]>([]);
+  const [exceptionDialogOpen, setExceptionDialogOpen] = useState(false);
+  const [exceptionForm, setExceptionForm] = useState({
+    date: toDateKey(new Date()),
+    type: "BLOCK" as "BLOCK" | "EXTRA",
+    startTime: "00:00",
+    endTime: "23:30",
+  });
 
   // Editing day
   const [editingDay, setEditingDay] = useState<number | null>(null);
@@ -215,6 +236,74 @@ const ProviderSchedulePage: React.FC = () => {
     }
   };
 
+  const openExceptionDialog = (date?: Date) => {
+    if (isLocked) {
+      toast.error(t("provider.accountLockedTitle"), {
+        description: t("provider.accountLockedMessage"),
+      });
+      return;
+    }
+    const dateKey = date ? toDateKey(date) : toDateKey(new Date());
+    const existing = exceptions.find((ex) => ex.date === dateKey);
+    setExceptionForm({
+      date: dateKey,
+      type: existing?.type || "BLOCK",
+      startTime: existing?.startTime || "00:00",
+      endTime: existing?.endTime || "23:30",
+    });
+    setExceptionDialogOpen(true);
+  };
+
+  const saveException = async () => {
+    if (!user) return;
+    if (exceptionForm.startTime >= exceptionForm.endTime) {
+      toast.error(t("schedule.exceptionTimeOrderError"));
+      return;
+    }
+
+    // Only one exception per exact date — a new save for the same date
+    // replaces whatever was there before.
+    const nextExceptions = [
+      ...exceptions.filter((ex) => ex.date !== exceptionForm.date),
+      {
+        id: exceptionForm.date,
+        date: exceptionForm.date,
+        type: exceptionForm.type,
+        startTime: exceptionForm.startTime,
+        endTime: exceptionForm.endTime,
+      },
+    ];
+
+    setExceptions(nextExceptions);
+    setExceptionDialogOpen(false);
+
+    try {
+      await updateProfileMutation.mutateAsync({
+        uid: user.uid,
+        updates: { availabilityExceptions: nextExceptions },
+      });
+      toast.success(t("common.success"));
+    } catch (error) {
+      console.error("Failed to save exception:", error);
+      toast.error(t("common.error"));
+    }
+  };
+
+  const deleteException = async (dateKey: string) => {
+    if (!user) return;
+    const nextExceptions = exceptions.filter((ex) => ex.date !== dateKey);
+    setExceptions(nextExceptions);
+    try {
+      await updateProfileMutation.mutateAsync({
+        uid: user.uid,
+        updates: { availabilityExceptions: nextExceptions },
+      });
+    } catch (error) {
+      console.error("Failed to delete exception:", error);
+      toast.error(t("common.error"));
+    }
+  };
+
   const isToday = (date: Date) => {
     const today = new Date();
     return (
@@ -243,6 +332,13 @@ const ProviderSchedulePage: React.FC = () => {
     const day = date.getDay();
     return !!weeklySchedule[day];
   };
+
+  const getException = (date: Date) => exceptions.find((ex) => ex.date === toDateKey(date));
+
+  const sortedExceptions = useMemo(
+    () => [...exceptions].sort((a, b) => (a.date < b.date ? -1 : 1)),
+    [exceptions],
+  );
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -331,6 +427,7 @@ const ProviderSchedulePage: React.FC = () => {
                 {calendarDays.map((date, index) => {
                   const isWork = isWorkDay(date);
                   const hasAppt = hasBooking(date);
+                  const exception = getException(date);
                   const today = isToday(date);
                   const inMonth = isCurrentMonth(date);
 
@@ -343,9 +440,13 @@ const ProviderSchedulePage: React.FC = () => {
                           ? "text-muted-foreground/50"
                           : today
                             ? "bg-primary text-primary-foreground font-bold"
-                            : isWork
-                              ? "bg-primary/10 text-foreground hover:bg-primary/20"
-                              : "text-muted-foreground hover:bg-accent"
+                            : exception?.type === "BLOCK"
+                              ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
+                              : exception?.type === "EXTRA"
+                                ? "bg-green-500/10 text-foreground hover:bg-green-500/20"
+                                : isWork
+                                  ? "bg-primary/10 text-foreground hover:bg-primary/20"
+                                  : "text-muted-foreground hover:bg-accent"
                       }`}
                     >
                       {date.getDate()}
@@ -373,8 +474,66 @@ const ProviderSchedulePage: React.FC = () => {
                   </div>
                   <span>{t("schedule.hasBooking")}</span>
                 </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded bg-destructive/10" />
+                  <span>{t("schedule.blockedDay")}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded bg-green-500/10" />
+                  <span>{t("schedule.extraDay")}</span>
+                </div>
               </div>
             </div>
+          </motion.section>
+
+          {/* Exceptions list */}
+          <motion.section variants={fadeInUp} className="mt-6">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-medium text-foreground">{t("schedule.exceptions")}</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => openExceptionDialog(selectedDate || undefined)}
+              >
+                <Plus className="h-4 w-4" />
+                {t("schedule.addException")}
+              </Button>
+            </div>
+            {sortedExceptions.length === 0 ? (
+              <div className="rounded-2xl bg-card p-4 text-center text-sm text-muted-foreground">
+                {t("schedule.noExceptions")}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {sortedExceptions.map((exception) => (
+                  <div
+                    key={exception.id}
+                    className="flex items-center justify-between rounded-xl bg-card p-4"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <CalendarOff className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-foreground">{exception.date}</span>
+                        <Badge variant={exception.type === "BLOCK" ? "destructive" : "default"}>
+                          {t(`schedule.${exception.type === "BLOCK" ? "blockedDay" : "extraDay"}`)}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {exception.startTime} - {exception.endTime}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => deleteException(exception.date)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </motion.section>
 
           {/* Selected Date Bookings */}
@@ -558,6 +717,107 @@ const ProviderSchedulePage: React.FC = () => {
               {t("common.cancel")}
             </Button>
             <Button onClick={saveDaySchedule} className="gap-2">
+              <Save className="h-4 w-4" />
+              {t("common.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add/Edit Exception Dialog */}
+      <Dialog open={exceptionDialogOpen} onOpenChange={setExceptionDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("schedule.addException")}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="exception-date">{t("schedule.exceptionDate")}</Label>
+              <input
+                id="exception-date"
+                type="date"
+                value={exceptionForm.date}
+                onChange={(e) =>
+                  setExceptionForm({ ...exceptionForm, date: e.target.value })
+                }
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <Label>{t("schedule.exceptionType")}</Label>
+              <Select
+                value={exceptionForm.type}
+                onValueChange={(value) =>
+                  setExceptionForm({ ...exceptionForm, type: value as "BLOCK" | "EXTRA" })
+                }
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BLOCK">{t("schedule.blockedDay")}</SelectItem>
+                  <SelectItem value="EXTRA">{t("schedule.extraDay")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t(
+                  exceptionForm.type === "BLOCK"
+                    ? "schedule.blockedDayHint"
+                    : "schedule.extraDayHint",
+                )}
+              </p>
+            </div>
+
+            <div>
+              <Label>{t("schedule.startTime")}</Label>
+              <Select
+                value={exceptionForm.startTime}
+                onValueChange={(value) =>
+                  setExceptionForm({ ...exceptionForm, startTime: value })
+                }
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIME_SLOTS.map((time) => (
+                    <SelectItem key={time} value={time}>
+                      {time}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>{t("schedule.endTime")}</Label>
+              <Select
+                value={exceptionForm.endTime}
+                onValueChange={(value) =>
+                  setExceptionForm({ ...exceptionForm, endTime: value })
+                }
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIME_SLOTS.map((time) => (
+                    <SelectItem key={time} value={time}>
+                      {time}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExceptionDialogOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={saveException} className="gap-2">
               <Save className="h-4 w-4" />
               {t("common.save")}
             </Button>

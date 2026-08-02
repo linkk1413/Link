@@ -30,6 +30,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
 
+// Common canned replies — tapping one fills the composer so the provider
+// can review/edit before sending, rather than sending instantly.
+const QUICK_REPLIES = [
+  "greeting",
+  "available",
+  "slotAvailable",
+  "slotUnavailable",
+  "requestReceived",
+  "onMyWay",
+  "thankYou",
+] as const;
+
 const ProviderChatRoomPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { chatId } = useParams<{ chatId: string }>();
@@ -311,6 +323,18 @@ const ProviderChatRoomPage: React.FC = () => {
 
       {/* Message Input */}
       <div className="fixed bottom-20 left-0 right-0 border-t border-border bg-card p-4">
+        <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1">
+          {QUICK_REPLIES.map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setMessageText(t(`chat.quickReplies.${key}`))}
+              className="shrink-0 whitespace-nowrap rounded-full bg-muted px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-accent"
+            >
+              {t(`chat.quickReplies.${key}`)}
+            </button>
+          ))}
+        </div>
         <div className="flex items-center gap-2">
           <Input
             value={messageText}
