@@ -12,6 +12,7 @@ import {
   orderBy,
   limit,
   getDocs,
+  getCountFromServer,
   addDoc,
   serverTimestamp,
   Timestamp,
@@ -2672,4 +2673,33 @@ export const isProviderFavorited = async (
   );
   const snapshot = await getDocs(q);
   return !snapshot.empty;
+};
+
+// ==================== ADMIN ALERT COUNTERS ====================
+// Cheap aggregation queries (no document reads) for the sidebar badges —
+// active complaints and pending verification requests.
+
+export const getAdminAlertCounts = async (): Promise<{
+  activeComplaints: number;
+  pendingVerifications: number;
+}> => {
+  const [complaintsSnap, verificationsSnap] = await Promise.all([
+    getCountFromServer(
+      query(
+        collection(db, COLLECTIONS.REPORTS),
+        where("status", "in", ["NEW", "PENDING"]),
+      ),
+    ),
+    getCountFromServer(
+      query(
+        collection(db, COLLECTIONS.VERIFICATIONS),
+        where("status", "==", "PENDING"),
+      ),
+    ),
+  ]);
+
+  return {
+    activeComplaints: complaintsSnap.data().count,
+    pendingVerifications: verificationsSnap.data().count,
+  };
 };

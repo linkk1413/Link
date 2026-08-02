@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import {
   Users,
   CheckCircle,
@@ -18,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { getAdminAlertCounts } from "@/lib/firestore";
 
 const adminNavItems = [
   {
@@ -39,6 +42,7 @@ const adminNavItems = [
     path: "/admin/verifications",
     labelKey: "admin.nav.verifications",
     icon: <CheckCircle className="h-5 w-5" />,
+    badgeKey: "pendingVerifications" as const,
   },
   {
     path: "/admin/payouts",
@@ -54,6 +58,7 @@ const adminNavItems = [
     path: "/admin/reports",
     labelKey: "admin.nav.reports",
     icon: <Flag className="h-5 w-5" />,
+    badgeKey: "activeComplaints" as const,
   },
   {
     path: "/admin/settings",
@@ -68,6 +73,16 @@ export const AdminLayout: React.FC = () => {
   const navigate = useNavigate();
   const isRTL = i18n.language === "ar";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const { data: alertCounts } = useQuery({
+    queryKey: ["admin", "alertCounts"],
+    queryFn: getAdminAlertCounts,
+    refetchInterval: 60000,
+  });
+
+  const getBadgeCount = (
+    badgeKey?: "activeComplaints" | "pendingVerifications",
+  ) => (badgeKey && alertCounts ? alertCounts[badgeKey] : 0);
 
   const handleLogout = async () => {
     await logout();
@@ -145,7 +160,12 @@ export const AdminLayout: React.FC = () => {
                 }
               >
                 {item.icon}
-                <span>{t(item.labelKey)}</span>
+                <span className="flex-1">{t(item.labelKey)}</span>
+                {getBadgeCount(item.badgeKey) > 0 && (
+                  <Badge variant="destructive" className="h-5 min-w-5 justify-center px-1.5">
+                    {getBadgeCount(item.badgeKey)}
+                  </Badge>
+                )}
               </NavLink>
             ))}
           </nav>
@@ -194,7 +214,12 @@ export const AdminLayout: React.FC = () => {
                 }
               >
                 {item.icon}
-                <span>{t(item.labelKey)}</span>
+                <span className="flex-1">{t(item.labelKey)}</span>
+                {getBadgeCount(item.badgeKey) > 0 && (
+                  <Badge variant="destructive" className="h-5 min-w-5 justify-center px-1.5">
+                    {getBadgeCount(item.badgeKey)}
+                  </Badge>
+                )}
               </NavLink>
             ))}
           </nav>
