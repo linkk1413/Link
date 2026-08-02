@@ -53,6 +53,16 @@ export const getAuthErrorMessage = (
         t("auth.errors.emailNotVerified") ||
         "Please verify your email before logging in."
       );
+    case "auth/account-suspended":
+      return (
+        t("auth.errors.accountSuspended") ||
+        "This account has been suspended. Contact support for help."
+      );
+    case "auth/account-inactive":
+      return (
+        t("auth.errors.accountInactive") ||
+        "This account is inactive. Contact support to reactivate it."
+      );
 
     // Phone errors
     case "auth/phone-already-in-use":

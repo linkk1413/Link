@@ -6,7 +6,6 @@ import {
   ArrowRight,
   ArrowLeft,
   Ban,
-  CheckCircle,
   UserCog,
   Pencil,
   Trash2,
@@ -57,7 +56,7 @@ import {
   useUser,
   useUsers,
   useUpdateUserStatus,
-  useUpdateUserRole,
+  useUpdateUserRoles,
   useAdminUpdateUserProfile,
   useDeleteUserAccount,
   useUserActivityCounts,
@@ -97,21 +96,23 @@ const AdminUserDetailPage: React.FC = () => {
   const { uid = "" } = useParams<{ uid: string }>();
   const { user } = useAuth();
 
-  const [actionDialog, setActionDialog] = useState<{
-    open: boolean;
-    action: "suspend" | "activate" | null;
-  }>({ open: false, action: null });
-  const [roleDialog, setRoleDialog] = useState<{
-    open: boolean;
-    newRole: UserRole;
-  }>({ open: false, newRole: "CLIENT" });
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editForm, setEditForm] = useState({
+  const [editForm, setEditForm] = useState<{
+    name: string;
+    phone: string;
+    region: string;
+    city: string;
+    district: string;
+    roles: UserRole[];
+    status: UserStatus;
+  }>({
     name: "",
     phone: "",
     region: "",
     city: "",
     district: "",
+    roles: ["CLIENT"],
+    status: "ACTIVE",
   });
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -153,7 +154,7 @@ const AdminUserDetailPage: React.FC = () => {
   );
 
   const updateStatusMutation = useUpdateUserStatus();
-  const updateRoleMutation = useUpdateUserRole();
+  const updateRolesMutation = useUpdateUserRoles();
   const updateProfileMutation = useAdminUpdateUserProfile();
   const deleteAccountMutation = useDeleteUserAccount();
   const deleteMessageMutation = useDeleteMessage();
@@ -222,46 +223,112 @@ const AdminUserDetailPage: React.FC = () => {
     [detailPayments],
   );
 
-  const openRoleDialog = () => {
-    if (!detailsUser) return;
-    const currentRole = detailsUser.role || detailsUser.roles?.[0] || "CLIENT";
-    setRoleDialog({ open: true, newRole: currentRole });
-  };
-
-  const confirmRoleChange = async () => {
-    if (!detailsUser) return;
-    try {
-      await updateRoleMutation.mutateAsync({
-        userId: detailsUser.uid,
-        role: roleDialog.newRole,
-      });
-      setRoleDialog({ open: false, newRole: "CLIENT" });
-      toast.success(t("common.success"));
-    } catch (error) {
-      console.error("Failed to update user role:", error);
-      toast.error(t("common.error"));
-    }
-  };
-
   const openEditDialog = () => {
     if (!detailsUser) return;
+    const currentRoles =
+      detailsUser.roles && detailsUser.roles.length > 0
+        ? detailsUser.roles
+        : detailsUser.role
+          ? [detailsUser.role]
+          : (["CLIENT"] as UserRole[]);
     setEditForm({
       name: detailsUser.name || "",
       phone: detailsUser.phone || "",
       region: detailsUser.region || "",
       city: detailsUser.city || "",
       district: detailsUser.district || "",
+      roles: currentRoles,
+      status: detailsUser.status || "ACTIVE",
     });
     setEditDialogOpen(true);
   };
 
+  const toggleEditRole = (role: UserRole, checked: boolean) => {
+    setEditForm((prev) => {
+      if (checked) {
+        return prev.roles.includes(role)
+          ? prev
+          : { ...prev, roles: [...prev.roles, role] };
+      }
+      // Always keep at least one role selected.
+      if (prev.roles.length <= 1) return prev;
+      return { ...prev, roles: prev.roles.filter((r) => r !== role) };
+    });
+  };
+
   const confirmEditUser = async () => {
     if (!detailsUser) return;
+    if (editForm.roles.length === 0) {
+      toast.error(t("admin.atLeastOneRoleRequired"));
+      return;
+    }
     try {
-      await updateProfileMutation.mutateAsync({
-        userId: detailsUser.uid,
-        updates: editForm,
-      });
+      const previousRoles =
+        detailsUser.roles && detailsUser.roles.length > 0
+          ? detailsUser.roles
+          : detailsUser.role
+            ? [detailsUser.role]
+            : (["CLIENT"] as UserRole[]);
+      const rolesChanged =
+        JSON.stringify([...editForm.roles].sort()) !==
+        JSON.stringify([...previousRoles].sort());
+      const previousStatus = detailsUser.status || "ACTIVE";
+      const statusChanged = editForm.status !== previousStatus;
+      const nextActiveRole = editForm.roles.includes(
+        detailsUser.activeRole as UserRole,
+      )
+        ? (detailsUser.activeRole as UserRole)
+        : editForm.roles[0];
+
+      await Promise.all([
+        updateProfileMutation.mutateAsync({
+          userId: detailsUser.uid,
+          updates: {
+            name: editForm.name,
+            phone: editForm.phone,
+            region: editForm.region,
+            city: editForm.city,
+            district: editForm.district,
+          },
+        }),
+        rolesChanged
+          ? updateRolesMutation.mutateAsync({
+              userId: detailsUser.uid,
+              roles: editForm.roles,
+              activeRole: nextActiveRole,
+            })
+          : Promise.resolve(),
+        statusChanged
+          ? updateStatusMutation.mutateAsync({
+              userId: detailsUser.uid,
+              status: editForm.status,
+            })
+          : Promise.resolve(),
+      ]);
+
+      if (rolesChanged) {
+        logAdminAction({
+          actorId: user?.uid || "",
+          actorName: user?.name || user?.displayName,
+          action: "USER_ROLES_CHANGED",
+          targetType: "USER",
+          targetId: detailsUser.uid,
+          targetLabel: detailsUser.name,
+          details: editForm.roles.join(", "),
+        });
+      }
+      if (statusChanged) {
+        logAdminAction({
+          actorId: user?.uid || "",
+          actorName: user?.name || user?.displayName,
+          action: "USER_STATUS_CHANGED",
+          targetType: "USER",
+          targetId: detailsUser.uid,
+          targetLabel: detailsUser.name,
+          details: `${previousStatus} → ${editForm.status}`,
+        });
+      }
+
       toast.success(t("common.success"));
       setEditDialogOpen(false);
     } catch (error) {
@@ -279,30 +346,6 @@ const AdminUserDetailPage: React.FC = () => {
       navigate("/admin/users");
     } catch (error) {
       console.error("Failed to delete account:", error);
-      toast.error(t("common.error"));
-    }
-  };
-
-  const confirmAction = async () => {
-    if (!detailsUser || !actionDialog.action) return;
-    const newStatus: UserStatus =
-      actionDialog.action === "suspend" ? "SUSPENDED" : "ACTIVE";
-    try {
-      await updateStatusMutation.mutateAsync({
-        userId: detailsUser.uid,
-        status: newStatus,
-      });
-      logAdminAction({
-        actorId: user?.uid || "",
-        actorName: user?.name || user?.displayName,
-        action: newStatus === "SUSPENDED" ? "USER_SUSPENDED" : "USER_ACTIVATED",
-        targetType: "USER",
-        targetId: detailsUser.uid,
-        targetLabel: detailsUser.name,
-      });
-      setActionDialog({ open: false, action: null });
-    } catch (error) {
-      console.error("Failed to update user status:", error);
       toast.error(t("common.error"));
     }
   };
@@ -415,13 +458,17 @@ const AdminUserDetailPage: React.FC = () => {
 
   const getStatusBadge = (status?: UserStatus) => {
     if (!status) return null;
-    return status === "ACTIVE" ? (
-      <Badge variant="default" className="bg-green-500">
-        {t("admin.active")}
-      </Badge>
-    ) : (
-      <Badge variant="destructive">{t("admin.suspended")}</Badge>
-    );
+    if (status === "ACTIVE") {
+      return (
+        <Badge variant="default" className="bg-green-500">
+          {t("admin.active")}
+        </Badge>
+      );
+    }
+    if (status === "INACTIVE") {
+      return <Badge variant="secondary">{t("admin.inactive")}</Badge>;
+    }
+    return <Badge variant="destructive">{t("admin.suspended")}</Badge>;
   };
 
   const formatDate = (date?: Date) =>
@@ -501,42 +548,18 @@ const AdminUserDetailPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {detailsUser.status === "ACTIVE" ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-destructive"
-                onClick={() => setActionDialog({ open: true, action: "suspend" })}
-              >
-                <Ban className="me-2 h-4 w-4" />
-                {t("admin.suspendUser")}
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setActionDialog({ open: true, action: "activate" })}
-              >
-                <CheckCircle className="me-2 h-4 w-4" />
-                {t("admin.activateUser")}
-              </Button>
-            )}
+            <Button variant="outline" size="sm" onClick={openEditDialog}>
+              <Pencil className="me-2 h-4 w-4" />
+              {t("admin.editUser")}
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
                   <UserCog className="me-2 h-4 w-4" />
-                  {t("admin.editUser")}
+                  {t("common.more")}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={openEditDialog}>
-                  <Pencil className="me-2 h-4 w-4" />
-                  {t("admin.editUser")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={openRoleDialog}>
-                  <UserCog className="me-2 h-4 w-4" />
-                  {t("admin.changeRole")}
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   className="text-destructive"
                   onClick={() => setDeleteDialog({ open: true, confirmed: false })}
@@ -1216,7 +1239,7 @@ const AdminUserDetailPage: React.FC = () => {
 
       {/* Edit user dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t("admin.editUser")}</DialogTitle>
             <DialogDescription>{detailsUser.name}</DialogDescription>
@@ -1264,12 +1287,58 @@ const AdminUserDetailPage: React.FC = () => {
                 }
               />
             </div>
+
+            <div className="space-y-2 border-t pt-4">
+              <Label>{t("admin.accountRoles")}</Label>
+              <div className="space-y-2">
+                {(["CLIENT", "PROVIDER", "ADMIN"] as UserRole[]).map((role) => (
+                  <div key={role} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`edit-role-${role}`}
+                      checked={editForm.roles.includes(role)}
+                      onCheckedChange={(checked) =>
+                        toggleEditRole(role, checked === true)
+                      }
+                    />
+                    <Label htmlFor={`edit-role-${role}`} className="font-normal">
+                      {t(`roles.${role.toLowerCase()}`)}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2 border-t pt-4">
+              <Label htmlFor="edit-status">{t("admin.accountStatus")}</Label>
+              <Select
+                value={editForm.status}
+                onValueChange={(value) =>
+                  setEditForm((prev) => ({ ...prev, status: value as UserStatus }))
+                }
+              >
+                <SelectTrigger id="edit-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACTIVE">{t("admin.active")}</SelectItem>
+                  <SelectItem value="SUSPENDED">{t("admin.suspended")}</SelectItem>
+                  <SelectItem value="INACTIVE">{t("admin.inactive")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button onClick={confirmEditUser} disabled={updateProfileMutation.isPending}>
+            <Button
+              onClick={confirmEditUser}
+              disabled={
+                updateProfileMutation.isPending ||
+                updateRolesMutation.isPending ||
+                updateStatusMutation.isPending
+              }
+            >
               {t("common.save")}
             </Button>
           </DialogFooter>
@@ -1320,82 +1389,6 @@ const AdminUserDetailPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Change role dialog */}
-      <Dialog
-        open={roleDialog.open}
-        onOpenChange={(open) => setRoleDialog({ open, newRole: roleDialog.newRole })}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("admin.changeRoleTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("admin.changeRoleDescription", { name: detailsUser.name })}
-            </DialogDescription>
-          </DialogHeader>
-          <Select
-            value={roleDialog.newRole}
-            onValueChange={(value) =>
-              setRoleDialog((prev) => ({ ...prev, newRole: value as UserRole }))
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="CLIENT">{t("roles.client")}</SelectItem>
-              <SelectItem value="PROVIDER">{t("roles.provider")}</SelectItem>
-              <SelectItem value="ADMIN">{t("roles.admin")}</SelectItem>
-            </SelectContent>
-          </Select>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setRoleDialog({ open: false, newRole: "CLIENT" })}
-            >
-              {t("common.cancel")}
-            </Button>
-            <Button onClick={confirmRoleChange} disabled={updateRoleMutation.isPending}>
-              {t("common.save")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Suspend/Activate confirmation */}
-      <Dialog
-        open={actionDialog.open}
-        onOpenChange={(open) => setActionDialog({ open, action: null })}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {actionDialog.action === "suspend"
-                ? t("admin.suspendTitle")
-                : t("admin.activateTitle")}
-            </DialogTitle>
-            <DialogDescription>
-              {actionDialog.action === "suspend"
-                ? t("admin.suspendDescription", { name: detailsUser.name })
-                : t("admin.activateDescription", { name: detailsUser.name })}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setActionDialog({ open: false, action: null })}
-            >
-              {t("common.cancel")}
-            </Button>
-            <Button
-              variant={actionDialog.action === "suspend" ? "destructive" : "default"}
-              onClick={confirmAction}
-              disabled={updateStatusMutation.isPending}
-            >
-              {actionDialog.action === "suspend" ? t("admin.suspend") : t("admin.activate")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

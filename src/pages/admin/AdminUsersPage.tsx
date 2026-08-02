@@ -147,6 +147,8 @@ const AdminUsersPage: React.FC = () => {
         );
       case "SUSPENDED":
         return <Badge variant="destructive">{t("admin.suspended")}</Badge>;
+      case "INACTIVE":
+        return <Badge variant="secondary">{t("admin.inactive")}</Badge>;
       default:
         return null;
     }
@@ -227,6 +229,7 @@ const AdminUsersPage: React.FC = () => {
                 <SelectItem value="SUSPENDED">
                   {t("admin.suspended")}
                 </SelectItem>
+                <SelectItem value="INACTIVE">{t("admin.inactive")}</SelectItem>
               </SelectContent>
             </Select>
           </div>

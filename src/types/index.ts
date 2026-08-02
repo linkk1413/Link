@@ -1,8 +1,12 @@
 // User roles in the app
 export type UserRole = "CLIENT" | "PROVIDER" | "ADMIN";
 
-// User status
-export type UserStatus = "ACTIVE" | "SUSPENDED";
+// User status. ACTIVE: full access. SUSPENDED: admin-initiated block (e.g.
+// for a complaint), can be lifted any time. INACTIVE: account not currently
+// in use (self- or admin-deactivated); same login block as SUSPENDED, kept
+// as a distinct value for reporting/semantics. Both non-ACTIVE states block
+// sign-in (see AuthContext.login) while preserving all of the user's data.
+export type UserStatus = "ACTIVE" | "SUSPENDED" | "INACTIVE";
 
 // Booking status
 export type BookingStatus =
@@ -449,6 +453,8 @@ export interface AppNotification {
 export type AdminAuditAction =
   | "USER_SUSPENDED"
   | "USER_ACTIVATED"
+  | "USER_STATUS_CHANGED"
+  | "USER_ROLES_CHANGED"
   | "USER_DELETED"
   | "VERIFICATION_APPROVED"
   | "VERIFICATION_REJECTED"

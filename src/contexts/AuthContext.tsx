@@ -86,6 +86,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const userDoc = await getUserDocument(fbUser.uid);
 
           if (userDoc) {
+            // A suspended/inactive account keeps all its data but may not
+            // use the app — sign it back out immediately, including on a
+            // page refresh of an already-open session.
+            if (userDoc.status && userDoc.status !== "ACTIVE") {
+              await signOut(auth);
+              setUser(null);
+              setFirebaseUser(null);
+              setIsLoading(false);
+              return;
+            }
             setUser(userDoc);
           } else {
             // User exists in Firebase Auth but not in Firestore
@@ -118,11 +128,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       );
       const fbUser = userCredential.user;
 
-      // Non-blocking: don't fail login if this write fails.
-      updateLastLogin(fbUser.uid).catch(console.error);
-
       // Get user document from Firestore
       const userDoc = await getUserDocument(fbUser.uid);
+
+      if (userDoc && userDoc.status && userDoc.status !== "ACTIVE") {
+        await signOut(auth);
+        throw {
+          code:
+            userDoc.status === "SUSPENDED"
+              ? "auth/account-suspended"
+              : "auth/account-inactive",
+          message: "Account is not active",
+        };
+      }
+
+      // Non-blocking: don't fail login if this write fails.
+      updateLastLogin(fbUser.uid).catch(console.error);
 
       if (userDoc) {
         setUser(userDoc);

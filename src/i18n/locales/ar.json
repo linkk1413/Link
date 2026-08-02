@@ -10,6 +10,7 @@
     "pleaseWait": "الرجاء الانتظار...",
     "cancel": "إلغاء",
     "confirm": "تأكيد",
+    "more": "المزيد",
     "save": "حفظ",
     "saving": "جاري الحفظ...",
     "delete": "حذف",
@@ -111,7 +112,9 @@
       "userDisabled": "تم تعطيل هذا الحساب.",
       "tooManyRequests": "محاولات كثيرة جداً. يرجى المحاولة لاحقاً.",
       "networkError": "خطأ في الشبكة. يرجى التحقق من الاتصال.",
-      "emailNotVerified": "يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول."
+      "emailNotVerified": "يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول.",
+      "accountSuspended": "تم إيقاف هذا الحساب. تواصلي مع الدعم للمساعدة.",
+      "accountInactive": "هذا الحساب غير نشط. تواصلي مع الدعم لإعادة تفعيله."
     }
   },
   "onboarding": {
@@ -618,9 +621,6 @@
       "auditLog": "سجل التدقيق"
     },
     "settingsTitle": "الإعدادات",
-    "changeRole": "تغيير الدور",
-    "changeRoleTitle": "تغيير دور المستخدم",
-    "changeRoleDescription": "حدد دور جديد لـ {{name}}. هذا يستبدل دورها/دوره الحالي.",
     "editUser": "تعديل البيانات",
     "userConversations": "المحادثات",
     "deleteAccount": "حذف الحساب",
@@ -674,15 +674,15 @@
     "noRole": "بدون دور",
     "active": "نشط",
     "suspended": "موقوف",
+    "inactive": "غير نشط",
     "pending": "قيد الانتظار",
     "suspendUser": "إيقاف المستخدمة",
-    "activateUser": "تفعيل المستخدمة",
     "suspendTitle": "إيقاف المستخدمة؟",
-    "activateTitle": "تفعيل المستخدمة؟",
     "suspendDescription": "هل أنتِ متأكدة من إيقاف {{name}}؟ لن تتمكن من الوصول إلى حسابها.",
-    "activateDescription": "هل أنتِ متأكدة من تفعيل {{name}}؟ ستستعيد الوصول إلى حسابها.",
     "suspend": "إيقاف",
-    "activate": "تفعيل",
+    "accountRoles": "أدوار الحساب",
+    "accountStatus": "حالة الحساب",
+    "atLeastOneRoleRequired": "يجب أن يكون للمستخدم دور واحد على الأقل.",
     "verifications": "توثيق مقدمات الخدمات",
     "verificationsDescription": "مراجعة والموافقة على طلبات التحقق من مقدمات الخدمات",
     "noVerifications": "لا توجد طلبات تحقق",
@@ -1225,6 +1225,8 @@
     "actions": {
       "USER_SUSPENDED": "تعليق حساب مستخدم",
       "USER_ACTIVATED": "تفعيل حساب مستخدم",
+      "USER_STATUS_CHANGED": "تغيير حالة حساب مستخدم",
+      "USER_ROLES_CHANGED": "تغيير أدوار مستخدم",
       "USER_DELETED": "حذف حساب مستخدم",
       "VERIFICATION_APPROVED": "الموافقة على توثيق",
       "VERIFICATION_REJECTED": "رفض توثيق",

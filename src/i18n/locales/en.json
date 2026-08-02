@@ -10,6 +10,7 @@
     "pleaseWait": "Please wait...",
     "cancel": "Cancel",
     "confirm": "Confirm",
+    "more": "More",
     "save": "Save",
     "saving": "Saving...",
     "delete": "Delete",
@@ -111,7 +112,9 @@
       "userDisabled": "This account has been disabled.",
       "tooManyRequests": "Too many failed attempts. Please try again later.",
       "networkError": "Network error. Please check your connection.",
-      "emailNotVerified": "Please verify your email before logging in."
+      "emailNotVerified": "Please verify your email before logging in.",
+      "accountSuspended": "This account has been suspended. Contact support for help.",
+      "accountInactive": "This account is inactive. Contact support to reactivate it."
     }
   },
   "onboarding": {
@@ -618,9 +621,6 @@
       "auditLog": "Audit Log"
     },
     "settingsTitle": "Settings",
-    "changeRole": "Change Role",
-    "changeRoleTitle": "Change user role",
-    "changeRoleDescription": "Set a new role for {{name}}. This replaces their current role(s).",
     "editUser": "Edit Info",
     "userConversations": "Conversations",
     "deleteAccount": "Delete Account",
@@ -674,15 +674,15 @@
     "noRole": "No Role",
     "active": "Active",
     "suspended": "Suspended",
+    "inactive": "Inactive",
     "pending": "Pending",
     "suspendUser": "Suspend User",
-    "activateUser": "Activate User",
     "suspendTitle": "Suspend User?",
-    "activateTitle": "Activate User?",
     "suspendDescription": "Are you sure you want to suspend {{name}}? They won't be able to access their account.",
-    "activateDescription": "Are you sure you want to activate {{name}}? They will regain access to their account.",
     "suspend": "Suspend",
-    "activate": "Activate",
+    "accountRoles": "Account Roles",
+    "accountStatus": "Account Status",
+    "atLeastOneRoleRequired": "The user must have at least one role.",
     "verifications": "Provider Verifications",
     "verificationsDescription": "Review and approve provider verification requests",
     "noVerifications": "No verification requests",
@@ -1225,6 +1225,8 @@
     "actions": {
       "USER_SUSPENDED": "User suspended",
       "USER_ACTIVATED": "User activated",
+      "USER_STATUS_CHANGED": "User account status changed",
+      "USER_ROLES_CHANGED": "User roles changed",
       "USER_DELETED": "User deleted",
       "VERIFICATION_APPROVED": "Verification approved",
       "VERIFICATION_REJECTED": "Verification rejected",

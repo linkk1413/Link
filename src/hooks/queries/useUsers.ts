@@ -171,22 +171,27 @@ export const useUpdateUserStatus = () => {
   });
 };
 
-// Change a user's role (admin-only action — firestore.rules blocks a user
-// from ever granting themselves ADMIN, but an existing admin may set anyone
-// else's role here).
-export const useUpdateUserRole = () => {
+// Change which role(s) a user holds (admin-only action — firestore.rules
+// blocks a user from ever granting themselves ADMIN, but an existing admin
+// may set anyone else's roles here). A user can hold more than one role at
+// once (e.g. CLIENT + PROVIDER); activeRole must be one of the granted
+// roles, and the legacy singular `role` field is kept in sync for
+// firestore.rules' role() fallback.
+export const useUpdateUserRoles = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({
       userId,
-      role,
+      roles,
+      activeRole,
     }: {
       userId: string;
-      role: UserRole;
+      roles: UserRole[];
+      activeRole: UserRole;
     }) => {
       const userRef = doc(db, "users", userId);
-      await updateDoc(userRef, { role, activeRole: role, roles: [role] });
+      await updateDoc(userRef, { roles, activeRole, role: activeRole });
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: userKeys.all });

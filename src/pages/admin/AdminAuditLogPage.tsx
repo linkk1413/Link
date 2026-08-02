@@ -18,6 +18,8 @@ import { AdminAuditAction } from "@/types";
 const ALL_ACTIONS: AdminAuditAction[] = [
   "USER_SUSPENDED",
   "USER_ACTIVATED",
+  "USER_STATUS_CHANGED",
+  "USER_ROLES_CHANGED",
   "USER_DELETED",
   "VERIFICATION_APPROVED",
   "VERIFICATION_REJECTED",
@@ -31,6 +33,8 @@ const ALL_ACTIONS: AdminAuditAction[] = [
 const ACTION_BADGE_COLOR: Record<AdminAuditAction, string> = {
   USER_SUSPENDED: "bg-red-100 text-red-800",
   USER_ACTIVATED: "bg-green-100 text-green-800",
+  USER_STATUS_CHANGED: "bg-amber-100 text-amber-800",
+  USER_ROLES_CHANGED: "bg-blue-100 text-blue-800",
   USER_DELETED: "bg-red-100 text-red-800",
   VERIFICATION_APPROVED: "bg-green-100 text-green-800",
   VERIFICATION_REJECTED: "bg-gray-100 text-gray-800",
