@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -63,6 +64,13 @@ const AdminVerificationsPage: React.FC = () => {
   );
   const [rejectionReason, setRejectionReason] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkActionType, setBulkActionType] = useState<
+    "approve" | "reject" | null
+  >(null);
+  const [bulkRejectionReason, setBulkRejectionReason] = useState("");
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   // Fetch verifications from Firestore
   useEffect(() => {
@@ -90,10 +98,31 @@ const AdminVerificationsPage: React.FC = () => {
     fetchVerifications();
   }, []);
 
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [activeTab]);
+
   // Filter by status
   const pendingRequests = verifications.filter((v) => v.status === "PENDING");
   const approvedRequests = verifications.filter((v) => v.status === "APPROVED");
   const rejectedRequests = verifications.filter((v) => v.status === "REJECTED");
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllPending = () => {
+    setSelectedIds((prev) =>
+      prev.size === pendingRequests.length
+        ? new Set()
+        : new Set(pendingRequests.map((r) => r.id)),
+    );
+  };
 
   const handleView = (request: VerificationRequest) => {
     setSelectedRequest(request);
@@ -162,6 +191,67 @@ const AdminVerificationsPage: React.FC = () => {
     }
   };
 
+  const openBulkAction = (action: "approve" | "reject") => {
+    setBulkActionType(action);
+    setBulkRejectionReason("");
+    setBulkDialogOpen(true);
+  };
+
+  const confirmBulkAction = async () => {
+    if (!bulkActionType || selectedIds.size === 0) return;
+
+    const targets = pendingRequests.filter((r) => selectedIds.has(r.id));
+
+    try {
+      setIsBulkProcessing(true);
+
+      await Promise.all(
+        targets.map(async (request) => {
+          const verificationRef = doc(db, "verifications", request.id);
+          const updateData: Record<string, unknown> = {
+            status: bulkActionType === "approve" ? "APPROVED" : "REJECTED",
+            updatedAt: new Date(),
+            updatedBy: user?.uid,
+          };
+          if (bulkActionType === "reject") {
+            updateData.reason = bulkRejectionReason;
+          }
+          await updateDoc(verificationRef, updateData);
+
+          if (bulkActionType === "approve") {
+            const providerRef = doc(db, "providers", request.providerId);
+            await updateDoc(providerRef, {
+              identityVerified: true,
+              identityVerifiedAt: new Date(),
+            });
+          }
+        }),
+      );
+
+      const targetIds = new Set(targets.map((r) => r.id));
+      setVerifications((prev) =>
+        prev.map((v) =>
+          targetIds.has(v.id)
+            ? {
+                ...v,
+                status: bulkActionType === "approve" ? "APPROVED" : "REJECTED",
+                reason:
+                  bulkActionType === "reject" ? bulkRejectionReason : undefined,
+              }
+            : v,
+        ),
+      );
+
+      setSelectedIds(new Set());
+      setBulkDialogOpen(false);
+      setBulkActionType(null);
+    } catch (error) {
+      console.error("Failed to process bulk verification action:", error);
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString(isArabic ? "ar-SA" : "en-US", {
       year: "numeric",
@@ -170,7 +260,10 @@ const AdminVerificationsPage: React.FC = () => {
     });
   };
 
-  const renderRequestList = (requests: VerificationRequest[]) => {
+  const renderRequestList = (
+    requests: VerificationRequest[],
+    selectable = false,
+  ) => {
     if (loading) {
       return (
         <div className="space-y-4">
@@ -198,6 +291,13 @@ const AdminVerificationsPage: React.FC = () => {
             className="flex items-center justify-between rounded-xl bg-card p-4"
           >
             <div className="flex items-center gap-4">
+              {selectable && (
+                <Checkbox
+                  checked={selectedIds.has(request.id)}
+                  onCheckedChange={() => toggleSelect(request.id)}
+                  aria-label={t("admin.selectRow")}
+                />
+              )}
               <Avatar className="h-12 w-12">
                 <AvatarImage src="" />
                 <AvatarFallback>
@@ -305,7 +405,43 @@ const AdminVerificationsPage: React.FC = () => {
           </TabsList>
 
           <TabsContent value="pending">
-            {renderRequestList(pendingRequests)}
+            {!loading && pendingRequests.length > 0 && (
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted/50 p-3">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={
+                      selectedIds.size > 0 &&
+                      selectedIds.size === pendingRequests.length
+                    }
+                    onCheckedChange={toggleSelectAllPending}
+                  />
+                  {selectedIds.size > 0
+                    ? t("admin.selectedCount", { count: selectedIds.size })
+                    : t("admin.selectAll")}
+                </label>
+
+                {selectedIds.size > 0 && (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => openBulkAction("approve")}
+                    >
+                      <CheckCircle className="me-1 h-4 w-4" />
+                      {t("admin.bulkApprove")}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => openBulkAction("reject")}
+                    >
+                      <XCircle className="me-1 h-4 w-4" />
+                      {t("admin.bulkReject")}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+            {renderRequestList(pendingRequests, true)}
           </TabsContent>
 
           <TabsContent value="approved">
@@ -411,6 +547,53 @@ const AdminVerificationsPage: React.FC = () => {
               {actionType === "approve"
                 ? t("admin.approve")
                 : t("admin.reject")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Action Confirmation Dialog */}
+      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {bulkActionType === "approve"
+                ? t("admin.bulkApproveTitle")
+                : t("admin.bulkRejectTitle")}
+            </DialogTitle>
+            <DialogDescription>
+              {bulkActionType === "approve"
+                ? t("admin.bulkApproveDescription", { count: selectedIds.size })
+                : t("admin.bulkRejectDescription", { count: selectedIds.size })}
+            </DialogDescription>
+          </DialogHeader>
+
+          {bulkActionType === "reject" && (
+            <div className="py-4">
+              <Label htmlFor="bulk-reason">{t("admin.rejectionReason")}</Label>
+              <Textarea
+                id="bulk-reason"
+                value={bulkRejectionReason}
+                onChange={(e) => setBulkRejectionReason(e.target.value)}
+                placeholder={t("admin.rejectionReasonPlaceholder")}
+                className="mt-1"
+                rows={3}
+              />
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setBulkDialogOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant={bulkActionType === "reject" ? "destructive" : "default"}
+              onClick={confirmBulkAction}
+              disabled={isBulkProcessing}
+            >
+              {bulkActionType === "approve"
+                ? t("admin.bulkApprove")
+                : t("admin.bulkReject")}
             </Button>
           </DialogFooter>
         </DialogContent>
