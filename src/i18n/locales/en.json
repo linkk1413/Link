@@ -503,6 +503,7 @@
     "addFirst": "Add your first service",
     "profileIncompleteTitle": "Complete your profile",
     "profileIncompleteDescription": "Add your phone, region, city, district, and bio before creating services.",
+    "completeProfileButton": "Complete profile",
     "verificationRequiredTitle": "Verification required",
     "verificationRequiredDescription": "Please complete verification before creating services.",
     "emailVerificationRequiredTitle": "Verify your email",

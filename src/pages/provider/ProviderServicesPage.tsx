@@ -15,6 +15,7 @@ import {
   Loader2,
   Shield,
   Lock,
+  UserCog,
 } from "lucide-react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
@@ -523,6 +524,38 @@ const ProviderServicesPage: React.FC = () => {
           </motion.div>
         )}
 
+        {/* Profile Incomplete Banner — required fields (phone/region/city/area/bio)
+            are silently required to publish; without this banner the add-service
+            buttons are just disabled with no explanation. */}
+        {canPublish && !isLocked && !isProfileComplete && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800"
+          >
+            <div className="flex items-start gap-3">
+              <UserCog className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-medium text-amber-800 dark:text-amber-200">
+                  {t("services.profileIncompleteTitle")}
+                </h3>
+                <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                  {t("services.profileIncompleteDescription")}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 border-amber-300 text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-900"
+                  onClick={() => navigate("/provider/profile")}
+                >
+                  <UserCog className="h-4 w-4 mr-2" />
+                  {t("services.completeProfileButton")}
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Email Verification Banner */}
         {needsEmailVerification && (
           <motion.div
@@ -577,7 +610,12 @@ const ProviderServicesPage: React.FC = () => {
             <Button
               onClick={openAddForm}
               className="mt-4 gap-2"
-              disabled={!isProfileComplete || isLocked || !canPublish}
+              disabled={
+                !isProfileComplete ||
+                isLocked ||
+                !canPublish ||
+                needsEmailVerification
+              }
             >
               <Plus className="h-4 w-4" />
               {t("services.addFirst")}

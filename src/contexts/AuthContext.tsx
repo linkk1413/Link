@@ -285,6 +285,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             region: "",
             city: "",
             area: "",
+            phone: user.phone,
           });
         }
 
@@ -328,8 +329,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Add PROVIDER role to user
         await addRoleToUser(firebaseUser.uid, "PROVIDER");
 
-        // Create provider profile with provided data
-        await createProviderProfile(firebaseUser.uid, providerData);
+        // Create provider profile with provided data. The phone number was
+        // already collected at signup — carry it over so a brand-new
+        // provider's profile is immediately "complete" (see isProfileComplete
+        // in ProviderServicesPage) without having to re-enter it.
+        await createProviderProfile(firebaseUser.uid, {
+          ...providerData,
+          phone: user.phone,
+        });
 
         // Update local state
         const updatedRoles = user.roles.includes("PROVIDER")

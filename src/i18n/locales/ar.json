@@ -501,6 +501,7 @@
     "editServiceDescription": "حدّثي تفاصيل خدمتك.",
     "profileIncompleteTitle": "أكملي ملفك الشخصي",
     "profileIncompleteDescription": "أضيفي رقم الهاتف والمنطقة والمدينة والحي والنبذة قبل إنشاء الخدمات.",
+    "completeProfileButton": "إكمال الملف الشخصي",
     "verificationRequiredTitle": "التوثيق مطلوب",
     "verificationRequiredDescription": "يرجى إكمال التوثيق قبل إنشاء الخدمات.",
     "emailVerificationRequiredTitle": "تأكيد البريد الإلكتروني",
