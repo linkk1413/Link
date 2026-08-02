@@ -96,6 +96,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Lightweight sign-in audit trail, written by the account holder
+    // themselves right after each successful login (see updateLastLogin).
+    // Append-only — not even the owner may edit or delete an entry.
+    match /users/{userId}/loginHistory/{entryId} {
+      allow read: if signedIn() && (userId == request.auth.uid || isAdmin());
+      allow create: if signedIn() && userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
     match /providers/{providerId} {
       allow read: if true;
       allow create: if isAdmin() || (

@@ -618,7 +618,8 @@
       "reports": "Complaints",
       "settings": "Settings",
       "orders": "Orders",
-      "auditLog": "Audit Log"
+      "auditLog": "Audit Log",
+      "account": "My Account"
     },
     "settingsTitle": "Settings",
     "editUser": "Edit Info",
@@ -1236,6 +1237,28 @@
       "REVIEW_DELETED": "Review deleted",
       "COMMISSION_RATE_CHANGED": "Commission rate changed"
     }
+  },
+  "adminAccount": {
+    "title": "My Account",
+    "subtitle": "Manage your own admin account and its security",
+    "personalInfo": "Personal Info",
+    "changeEmail": "Change Email",
+    "changeEmailDescription": "We'll send a verification link to the new address. Your email won't change until you click it.",
+    "newEmail": "New email",
+    "sendVerification": "Send verification",
+    "emailChangeSent": "Verification link sent. Check the new inbox to complete the change.",
+    "changePassword": "Change Password",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "passwordsDontMatch": "The new password and confirmation don't match.",
+    "passwordChanged": "Password changed successfully.",
+    "wrongCurrentPassword": "Current password is incorrect.",
+    "security": "Security",
+    "lastLogin": "Last login",
+    "lastLoginDevice": "Last login device",
+    "loginHistory": "Recent sign-ins",
+    "noLoginHistory": "No sign-in history yet"
   },
   "complaints": {
     "title": "Complaints",

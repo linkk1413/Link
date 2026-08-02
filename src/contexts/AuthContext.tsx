@@ -20,6 +20,7 @@ import { auth } from "@/lib/firebase";
 import {
   createUserDocument,
   getUserDocument,
+  updateUserProfile,
   updateUserRole as updateUserRoleInFirestore,
   switchActiveRole as switchActiveRoleInFirestore,
   addRoleToUser,
@@ -95,6 +96,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               setFirebaseUser(null);
               setIsLoading(false);
               return;
+            }
+            // verifyBeforeUpdateEmail (the admin email-change flow) only
+            // updates the Firebase Auth email once the user clicks the link
+            // sent to their new inbox — sync our denormalized Firestore copy
+            // once that's happened.
+            if (fbUser.email && userDoc.email !== fbUser.email) {
+              updateUserProfile(fbUser.uid, { email: fbUser.email }).catch(
+                console.error,
+              );
+              userDoc.email = fbUser.email;
             }
             setUser(userDoc);
           } else {

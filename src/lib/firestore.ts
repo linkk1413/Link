@@ -50,6 +50,7 @@ import {
   AdminAuditAction,
   AdminAuditTargetType,
   AuditLogEntry,
+  LoginHistoryEntry,
 } from "@/types";
 
 // Collection names
@@ -214,8 +215,40 @@ export const getUserDocument = async (uid: string): Promise<User | null> => {
 // Non-blocking by convention at the call site — a failed write here
 // shouldn't fail login.
 export const updateLastLogin = async (uid: string): Promise<void> => {
+  const device =
+    typeof navigator !== "undefined" ? navigator.userAgent : undefined;
   const userRef = doc(db, COLLECTIONS.USERS, uid);
-  await updateDoc(userRef, { lastLoginAt: serverTimestamp() });
+  await Promise.all([
+    updateDoc(userRef, {
+      lastLoginAt: serverTimestamp(),
+      lastLoginDevice: device || null,
+    }),
+    addDoc(collection(db, COLLECTIONS.USERS, uid, "loginHistory"), {
+      device: device || null,
+      createdAt: serverTimestamp(),
+    }),
+  ]);
+};
+
+export const getLoginHistory = async (
+  uid: string,
+  limitCount = 10,
+): Promise<LoginHistoryEntry[]> => {
+  const snapshot = await getDocs(
+    query(
+      collection(db, COLLECTIONS.USERS, uid, "loginHistory"),
+      orderBy("createdAt", "desc"),
+      limit(limitCount),
+    ),
+  );
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      device: data.device || undefined,
+      createdAt: data.createdAt?.toDate?.() || new Date(),
+    };
+  });
 };
 
 // Update user role in Firestore (legacy - kept for compatibility)

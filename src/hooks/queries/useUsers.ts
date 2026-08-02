@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
+import { getLoginHistory } from "@/lib/firestore";
 import { User, UserRole, UserStatus } from "@/types";
 
 // Query keys
@@ -265,6 +266,16 @@ export const useUserActivityCounts = (userId: string) => {
         reportCount: reports.data().count,
       };
     },
+    enabled: !!userId,
+  });
+};
+
+// The signed-in account's own recent sign-in history (see AdminAccountPage's
+// security section).
+export const useLoginHistory = (userId: string) => {
+  return useQuery({
+    queryKey: ["users", "loginHistory", userId],
+    queryFn: () => getLoginHistory(userId),
     enabled: !!userId,
   });
 };

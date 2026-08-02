@@ -113,6 +113,16 @@ export interface User {
   createdAt: Date;
   // Written by AuthContext on successful sign-in.
   lastLoginAt?: Date;
+  lastLoginDevice?: string;
+}
+
+// One entry in users/{uid}/loginHistory — a lightweight sign-in audit trail
+// for the account owner (see AdminAccountPage's security section). Written
+// client-side by the account holder themselves at login time.
+export interface LoginHistoryEntry {
+  id: string;
+  device?: string;
+  createdAt: Date;
 }
 
 // Provider profile

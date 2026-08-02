@@ -74,6 +74,7 @@ import AdminReportDetailPage from "@/pages/admin/AdminReportDetailPage";
 import AdminSettingsPage from "@/pages/admin/AdminSettingsPage";
 import AdminOrdersPage from "@/pages/admin/AdminOrdersPage";
 import AdminAuditLogPage from "@/pages/admin/AdminAuditLogPage";
+import AdminAccountPage from "@/pages/admin/AdminAccountPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -221,6 +222,7 @@ const AppRoutes = () => {
         <Route path="settings" element={<AdminSettingsPage />} />
         <Route path="orders" element={<AdminOrdersPage />} />
         <Route path="audit-log" element={<AdminAuditLogPage />} />
+        <Route path="account" element={<AdminAccountPage />} />
       </Route>
 
       {/* Catch-all */}

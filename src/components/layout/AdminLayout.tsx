@@ -15,6 +15,7 @@ import {
   Settings,
   ClipboardList,
   History,
+  UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -71,6 +72,11 @@ const adminNavItems = [
     path: "/admin/settings",
     labelKey: "admin.nav.settings",
     icon: <Settings className="h-5 w-5" />,
+  },
+  {
+    path: "/admin/account",
+    labelKey: "admin.nav.account",
+    icon: <UserCircle className="h-5 w-5" />,
   },
 ];
 

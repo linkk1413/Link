@@ -618,7 +618,8 @@
       "reports": "الشكاوى",
       "settings": "الإعدادات",
       "orders": "الطلبات",
-      "auditLog": "سجل التدقيق"
+      "auditLog": "سجل التدقيق",
+      "account": "حسابي"
     },
     "settingsTitle": "الإعدادات",
     "editUser": "تعديل البيانات",
@@ -1236,6 +1237,28 @@
       "REVIEW_DELETED": "حذف تقييم",
       "COMMISSION_RATE_CHANGED": "تغيير نسبة العمولة"
     }
+  },
+  "adminAccount": {
+    "title": "حسابي",
+    "subtitle": "إدارة حساب الإدارة الخاص بك وأمانه",
+    "personalInfo": "المعلومات الشخصية",
+    "changeEmail": "تغيير البريد الإلكتروني",
+    "changeEmailDescription": "سنرسل رابط تحقق إلى البريد الجديد. لن يتغيّر بريدك حتى تضغطي عليه.",
+    "newEmail": "البريد الإلكتروني الجديد",
+    "sendVerification": "إرسال رابط التحقق",
+    "emailChangeSent": "تم إرسال رابط التحقق. تحققي من البريد الجديد لإتمام التغيير.",
+    "changePassword": "تغيير كلمة المرور",
+    "currentPassword": "كلمة المرور الحالية",
+    "newPassword": "كلمة المرور الجديدة",
+    "confirmPassword": "تأكيد كلمة المرور الجديدة",
+    "passwordsDontMatch": "كلمة المرور الجديدة والتأكيد غير متطابقتين.",
+    "passwordChanged": "تم تغيير كلمة المرور بنجاح.",
+    "wrongCurrentPassword": "كلمة المرور الحالية غير صحيحة.",
+    "security": "الأمان",
+    "lastLogin": "آخر تسجيل دخول",
+    "lastLoginDevice": "جهاز آخر تسجيل دخول",
+    "loginHistory": "آخر عمليات تسجيل الدخول",
+    "noLoginHistory": "لا يوجد سجل تسجيل دخول بعد"
   },
   "complaints": {
     "title": "الشكاوى",
