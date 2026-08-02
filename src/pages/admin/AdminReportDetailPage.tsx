@@ -56,6 +56,7 @@ import { useUpdateUserStatus, useDeleteUserAccount } from "@/hooks/queries/useUs
 import { useChat, useChatMessages, useDeleteMessage } from "@/hooks/queries/useChats";
 import { useService } from "@/hooks/queries/useServices";
 import { useBooking } from "@/hooks/queries/useBookings";
+import { logAdminAction } from "@/lib/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import { ReportStatus } from "@/types";
 import { toast } from "sonner";
@@ -165,6 +166,15 @@ const AdminReportDetailPage: React.FC = () => {
         resolvedBy: user?.uid,
         resolvedByName: user?.name || user?.displayName,
       });
+      logAdminAction({
+        actorId: user?.uid || "",
+        actorName: user?.name || user?.displayName,
+        action: "REPORT_STATUS_CHANGED",
+        targetType: "REPORT",
+        targetId: id,
+        targetLabel: report?.reporterName,
+        details: `${status} → ${value}`,
+      });
       toast.success(t("adminReports.statusUpdated"));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -221,6 +231,14 @@ const AdminReportDetailPage: React.FC = () => {
         authorName: user?.name || user?.displayName,
         note: "[Review deleted by admin]",
       });
+      logAdminAction({
+        actorId: user?.uid || "",
+        actorName: user?.name || user?.displayName,
+        action: "REVIEW_DELETED",
+        targetType: "REVIEW",
+        targetId: report.targetId,
+        targetLabel: reportedReview?.providerId,
+      });
       toast.success(t("adminReports.contentDeleted"));
     } catch (error) {
       toast.error(t("common.error"));
@@ -244,6 +262,15 @@ const AdminReportDetailPage: React.FC = () => {
     if (!report?.targetOwnerId) return;
     try {
       await suspendUser.mutateAsync({ userId: report.targetOwnerId, status: "SUSPENDED" });
+      logAdminAction({
+        actorId: user?.uid || "",
+        actorName: user?.name || user?.displayName,
+        action: "USER_SUSPENDED",
+        targetType: "USER",
+        targetId: report.targetOwnerId,
+        targetLabel: report.targetOwnerName,
+        details: `From complaint #${id}`,
+      });
       toast.success(t("admin.accountSuspendedShort"));
       setSuspendConfirmOpen(false);
     } catch (error) {

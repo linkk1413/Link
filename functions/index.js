@@ -1305,6 +1305,9 @@ exports.adminDeleteUser = onCall(async (request) => {
     );
   }
 
+  const targetSnap = await db.collection("users").doc(targetUid).get();
+  const targetData = targetSnap.exists ? targetSnap.data() : null;
+
   try {
     await admin.auth().deleteUser(targetUid);
   } catch (error) {
@@ -1320,6 +1323,21 @@ exports.adminDeleteUser = onCall(async (request) => {
   batch.delete(db.collection("users").doc(targetUid));
   batch.delete(db.collection("providers").doc(targetUid));
   await batch.commit();
+
+  try {
+    await db.collection("auditLogs").add({
+      actorId: callerUid,
+      actorName: callerSnap.data()?.name || callerSnap.data()?.email || null,
+      action: "USER_DELETED",
+      targetType: "USER",
+      targetId: targetUid,
+      targetLabel: targetData?.name || targetData?.email || null,
+      details: null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("Failed to write audit log for adminDeleteUser:", error);
+  }
 
   return { success: true };
 });

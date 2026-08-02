@@ -34,6 +34,7 @@ import {
   orderBy,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { logAdminAction } from "@/lib/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface VerificationRequest {
@@ -181,6 +182,19 @@ const AdminVerificationsPage: React.FC = () => {
         ),
       );
 
+      logAdminAction({
+        actorId: user?.uid || "",
+        actorName: user?.name || user?.displayName,
+        action:
+          actionType === "approve"
+            ? "VERIFICATION_APPROVED"
+            : "VERIFICATION_REJECTED",
+        targetType: "VERIFICATION",
+        targetId: selectedRequest.id,
+        targetLabel: selectedRequest.providerName,
+        details: actionType === "reject" ? rejectionReason : undefined,
+      });
+
       setActionDialogOpen(false);
       setSelectedRequest(null);
       setActionType(null);
@@ -241,6 +255,21 @@ const AdminVerificationsPage: React.FC = () => {
             : v,
         ),
       );
+
+      logAdminAction({
+        actorId: user?.uid || "",
+        actorName: user?.name || user?.displayName,
+        action:
+          bulkActionType === "approve"
+            ? "VERIFICATION_APPROVED"
+            : "VERIFICATION_REJECTED",
+        targetType: "VERIFICATION",
+        targetLabel: `${targets.length} providers`,
+        details: targets
+          .map((r) => r.providerName)
+          .join(", ")
+          .slice(0, 500),
+      });
 
       setSelectedIds(new Set());
       setBulkDialogOpen(false);

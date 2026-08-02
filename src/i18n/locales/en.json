@@ -605,7 +605,8 @@
       "subscriptions": "Subscriptions",
       "reports": "Complaints",
       "settings": "Settings",
-      "orders": "Orders"
+      "orders": "Orders",
+      "auditLog": "Audit Log"
     },
     "settingsTitle": "Settings",
     "changeRole": "Change Role",
@@ -1201,6 +1202,27 @@
     "filterAllStatuses": "All statuses",
     "filterFrom": "From",
     "filterTo": "To"
+  },
+  "adminAuditLog": {
+    "title": "Audit Log",
+    "subtitle": "A record of every privileged admin action on the platform",
+    "searchPlaceholder": "Search by admin, target, or details...",
+    "filterAction": "Action",
+    "filterAllActions": "All actions",
+    "noEntries": "No audit log entries found",
+    "by": "By {{name}}",
+    "actions": {
+      "USER_SUSPENDED": "User suspended",
+      "USER_ACTIVATED": "User activated",
+      "USER_DELETED": "User deleted",
+      "VERIFICATION_APPROVED": "Verification approved",
+      "VERIFICATION_REJECTED": "Verification rejected",
+      "REPORT_STATUS_CHANGED": "Complaint status changed",
+      "REVIEW_HIDDEN": "Review hidden",
+      "REVIEW_RESTORED": "Review restored",
+      "REVIEW_DELETED": "Review deleted",
+      "COMMISSION_RATE_CHANGED": "Commission rate changed"
+    }
   },
   "complaints": {
     "title": "Complaints",

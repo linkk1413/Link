@@ -49,12 +49,14 @@ import {
   useDeleteCategory,
 } from "@/hooks/queries/useCategories";
 import { CategoryIcon } from "@/components/CategoryIcon";
-import { forceReseedCategories } from "@/lib/firestore";
+import { forceReseedCategories, logAdminAction } from "@/lib/firestore";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/sonner";
 import { BannerSettings, ProviderBannerSettings, Category } from "@/types";
 
 const AdminSettingsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
 
   const { data: categories = [], isLoading: loadingCategories } =
     useAllCategories();
@@ -185,9 +187,19 @@ const AdminSettingsPage: React.FC = () => {
   };
 
   const handleCommissionUpdate = async () => {
+    const previousPercent =
+      subscriptionSettings?.platformCommissionPercent ?? 15;
     try {
       await updateSubscriptionSettings.mutateAsync({
         platformCommissionPercent: commissionPercent,
+      });
+      logAdminAction({
+        actorId: user?.uid || "",
+        actorName: user?.name || user?.displayName,
+        action: "COMMISSION_RATE_CHANGED",
+        targetType: "SETTINGS",
+        targetLabel: "platformCommissionPercent",
+        details: `${previousPercent}% → ${commissionPercent}%`,
       });
       toast.success(t("admin.commissionUpdated"));
     } catch (error) {

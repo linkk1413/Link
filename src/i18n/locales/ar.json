@@ -605,7 +605,8 @@
       "subscriptions": "الاشتراكات",
       "reports": "الشكاوى",
       "settings": "الإعدادات",
-      "orders": "الطلبات"
+      "orders": "الطلبات",
+      "auditLog": "سجل التدقيق"
     },
     "settingsTitle": "الإعدادات",
     "changeRole": "تغيير الدور",
@@ -1201,6 +1202,27 @@
     "filterAllStatuses": "كل الحالات",
     "filterFrom": "من تاريخ",
     "filterTo": "إلى تاريخ"
+  },
+  "adminAuditLog": {
+    "title": "سجل التدقيق",
+    "subtitle": "سجل بجميع الإجراءات الإدارية الحساسة على المنصة",
+    "searchPlaceholder": "البحث بالإدارية أو الهدف أو التفاصيل...",
+    "filterAction": "الإجراء",
+    "filterAllActions": "جميع الإجراءات",
+    "noEntries": "لا توجد سجلات تدقيق",
+    "by": "بواسطة {{name}}",
+    "actions": {
+      "USER_SUSPENDED": "تعليق حساب مستخدم",
+      "USER_ACTIVATED": "تفعيل حساب مستخدم",
+      "USER_DELETED": "حذف حساب مستخدم",
+      "VERIFICATION_APPROVED": "الموافقة على توثيق",
+      "VERIFICATION_REJECTED": "رفض توثيق",
+      "REPORT_STATUS_CHANGED": "تغيير حالة شكوى",
+      "REVIEW_HIDDEN": "إخفاء تقييم",
+      "REVIEW_RESTORED": "استعادة تقييم",
+      "REVIEW_DELETED": "حذف تقييم",
+      "COMMISSION_RATE_CHANGED": "تغيير نسبة العمولة"
+    }
   },
   "complaints": {
     "title": "الشكاوى",

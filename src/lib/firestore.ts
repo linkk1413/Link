@@ -47,6 +47,9 @@ import {
   BlockedUser,
   Favorite,
   AppNotification,
+  AdminAuditAction,
+  AdminAuditTargetType,
+  AuditLogEntry,
 } from "@/types";
 
 // Collection names
@@ -67,6 +70,7 @@ export const COLLECTIONS = {
   VERIFICATIONS: "verifications",
   FAVORITES: "favorites",
   NOTIFICATIONS: "notifications",
+  AUDIT_LOGS: "auditLogs",
 } as const;
 
 // Convert Firestore timestamp to Date
@@ -2702,4 +2706,61 @@ export const getAdminAlertCounts = async (): Promise<{
     activeComplaints: complaintsSnap.data().count,
     pendingVerifications: verificationsSnap.data().count,
   };
+};
+
+// ==================== ADMIN AUDIT LOG ====================
+// Append-only trail of privileged admin actions (suspend/delete a user,
+// approve/reject verifications, moderate reviews, change platform
+// settings...). Written best-effort right after the real action succeeds —
+// a logging failure must never block the action itself.
+
+export const logAdminAction = async (entry: {
+  actorId: string;
+  actorName?: string;
+  action: AdminAuditAction;
+  targetType: AdminAuditTargetType;
+  targetId?: string;
+  targetLabel?: string;
+  details?: string;
+}): Promise<void> => {
+  try {
+    await addDoc(collection(db, COLLECTIONS.AUDIT_LOGS), {
+      actorId: entry.actorId,
+      actorName: entry.actorName || null,
+      action: entry.action,
+      targetType: entry.targetType,
+      targetId: entry.targetId || null,
+      targetLabel: entry.targetLabel || null,
+      details: entry.details || null,
+      createdAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("Failed to write audit log entry:", error);
+  }
+};
+
+export const getAuditLogs = async (
+  limitCount = 200,
+): Promise<AuditLogEntry[]> => {
+  const snapshot = await getDocs(
+    query(
+      collection(db, COLLECTIONS.AUDIT_LOGS),
+      orderBy("createdAt", "desc"),
+      limit(limitCount),
+    ),
+  );
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      actorId: data.actorId,
+      actorName: data.actorName || undefined,
+      action: data.action,
+      targetType: data.targetType,
+      targetId: data.targetId || undefined,
+      targetLabel: data.targetLabel || undefined,
+      details: data.details || undefined,
+      createdAt: data.createdAt?.toDate?.() || new Date(),
+    } as AuditLogEntry;
+  });
 };

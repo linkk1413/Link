@@ -316,6 +316,15 @@ service cloud.firestore {
       allow delete: if signedIn() && resource.data.userId == request.auth.uid;
     }
 
+    // Append-only audit trail of privileged admin actions. No update/delete
+    // for anyone — including admins — so it can't be tampered with after
+    // the fact.
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+
     match /settings/{settingId} {
       allow read: if true;
       allow write: if isAdmin();

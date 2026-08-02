@@ -433,6 +433,40 @@ export interface AppNotification {
   createdAt: Date;
 }
 
+// Admin action audit trail — append-only, admin-only read/write (see
+// firestore.rules). Written best-effort right after the real privileged
+// action succeeds; a logging failure never blocks the action itself.
+export type AdminAuditAction =
+  | "USER_SUSPENDED"
+  | "USER_ACTIVATED"
+  | "USER_DELETED"
+  | "VERIFICATION_APPROVED"
+  | "VERIFICATION_REJECTED"
+  | "REPORT_STATUS_CHANGED"
+  | "REVIEW_HIDDEN"
+  | "REVIEW_RESTORED"
+  | "REVIEW_DELETED"
+  | "COMMISSION_RATE_CHANGED";
+
+export type AdminAuditTargetType =
+  | "USER"
+  | "VERIFICATION"
+  | "REPORT"
+  | "REVIEW"
+  | "SETTINGS";
+
+export interface AuditLogEntry {
+  id: string;
+  actorId: string;
+  actorName?: string;
+  action: AdminAuditAction;
+  targetType: AdminAuditTargetType;
+  targetId?: string;
+  targetLabel?: string;
+  details?: string;
+  createdAt: Date;
+}
+
 // Time slot for booking
 export interface TimeSlot {
   startTime: string; // "HH:mm"

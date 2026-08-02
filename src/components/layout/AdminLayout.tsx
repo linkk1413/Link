@@ -14,6 +14,7 @@ import {
   X,
   Settings,
   ClipboardList,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -60,6 +61,11 @@ const adminNavItems = [
     labelKey: "admin.nav.reports",
     icon: <Flag className="h-5 w-5" />,
     badgeKey: "activeComplaints" as const,
+  },
+  {
+    path: "/admin/audit-log",
+    labelKey: "admin.nav.auditLog",
+    icon: <History className="h-5 w-5" />,
   },
   {
     path: "/admin/settings",

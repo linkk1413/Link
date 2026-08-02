@@ -86,6 +86,8 @@ import {
   getDistrictLabel,
   getRegionLabel,
 } from "@/lib/saudiLocations";
+import { logAdminAction } from "@/lib/firestore";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AdminUserDetailPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -93,6 +95,7 @@ const AdminUserDetailPage: React.FC = () => {
   const isRTL = isArabic;
   const navigate = useNavigate();
   const { uid = "" } = useParams<{ uid: string }>();
+  const { user } = useAuth();
 
   const [actionDialog, setActionDialog] = useState<{
     open: boolean;
@@ -289,6 +292,14 @@ const AdminUserDetailPage: React.FC = () => {
         userId: detailsUser.uid,
         status: newStatus,
       });
+      logAdminAction({
+        actorId: user?.uid || "",
+        actorName: user?.name || user?.displayName,
+        action: newStatus === "SUSPENDED" ? "USER_SUSPENDED" : "USER_ACTIVATED",
+        targetType: "USER",
+        targetId: detailsUser.uid,
+        targetLabel: detailsUser.name,
+      });
       setActionDialog({ open: false, action: null });
     } catch (error) {
       console.error("Failed to update user status:", error);
@@ -315,6 +326,14 @@ const AdminUserDetailPage: React.FC = () => {
         userId: suspendTarget.uid,
         status: "SUSPENDED",
       });
+      logAdminAction({
+        actorId: user?.uid || "",
+        actorName: user?.name || user?.displayName,
+        action: "USER_SUSPENDED",
+        targetType: "USER",
+        targetId: suspendTarget.uid,
+        targetLabel: suspendTarget.label,
+      });
       toast.success(t("admin.accountSuspendedShort"));
       setSuspendTarget(null);
     } catch (error) {
@@ -334,6 +353,14 @@ const AdminUserDetailPage: React.FC = () => {
           bookingId: review.bookingId,
           clientId: review.clientId,
         });
+        logAdminAction({
+          actorId: user?.uid || "",
+          actorName: user?.name || user?.displayName,
+          action: "REVIEW_DELETED",
+          targetType: "REVIEW",
+          targetId: review.id,
+          targetLabel: review.providerId,
+        });
         toast.success(t("adminReviews.reviewDeleted"));
       } else {
         await setReviewHiddenMutation.mutateAsync({
@@ -341,6 +368,14 @@ const AdminUserDetailPage: React.FC = () => {
           hidden: type === "hide",
           providerId: review.providerId,
           clientId: review.clientId,
+        });
+        logAdminAction({
+          actorId: user?.uid || "",
+          actorName: user?.name || user?.displayName,
+          action: type === "hide" ? "REVIEW_HIDDEN" : "REVIEW_RESTORED",
+          targetType: "REVIEW",
+          targetId: review.id,
+          targetLabel: review.providerId,
         });
         toast.success(
           type === "hide"
