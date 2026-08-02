@@ -9,6 +9,8 @@ import {
   CheckCircle,
   Clock,
   MessageSquare,
+  MessageCircle,
+  Phone,
   Calendar,
   Navigation,
   Flag,
@@ -51,6 +53,11 @@ import {
 import { Service } from "@/types";
 import { formatServiceDuration } from "@/lib/duration";
 import { formatLocation } from "@/lib/saudiLocations";
+import {
+  DEFAULT_COMMUNICATION_PREFS,
+  getWhatsappLink,
+  getTelLink,
+} from "@/lib/phone";
 import { ReportDialog } from "@/components/ReportDialog";
 import { ReviewDialog } from "@/components/ReviewDialog";
 import { toast } from "sonner";
@@ -154,6 +161,14 @@ const ProviderProfilePage: React.FC = () => {
       toast.error(t("common.error"));
     }
   };
+
+  const communicationPrefs =
+    provider?.communicationPrefs || DEFAULT_COMMUNICATION_PREFS;
+  const showChatButton = communicationPrefs.inAppChat;
+  const showWhatsappButton = communicationPrefs.whatsapp && !!provider?.phone;
+  const showCallButton = communicationPrefs.phoneCall && !!provider?.phone;
+  const hasAnyContactMethod =
+    showChatButton || showWhatsappButton || showCallButton;
 
   const handleBlock = async () => {
     if (!user || !id) return;
@@ -529,20 +544,56 @@ const ProviderProfilePage: React.FC = () => {
 
       {/* Fixed Bottom Actions */}
       <div className="fixed bottom-20 left-0 right-0 border-t border-border bg-card p-4">
-        <div className="container flex gap-3">
+        <div className="container flex flex-col gap-2">
+          {hasAnyContactMethod && (
+            <div className="flex gap-2">
+              {showChatButton && (
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-1.5 px-2"
+                  onClick={handleMessage}
+                  disabled={createChatMutation.isPending}
+                >
+                  <MessageSquare className="h-4 w-4 shrink-0" />
+                  <span className="truncate">
+                    {createChatMutation.isPending
+                      ? t("common.loading")
+                      : t("provider.messageProvider")}
+                  </span>
+                </Button>
+              )}
+              {showWhatsappButton && (
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-1.5 border-green-600/40 px-2 text-green-600 hover:bg-green-600/10 hover:text-green-600"
+                  asChild
+                >
+                  <a
+                    href={getWhatsappLink(provider.phone as string)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <MessageCircle className="h-4 w-4 shrink-0" />
+                    <span className="truncate">
+                      {t("provider.whatsappProvider")}
+                    </span>
+                  </a>
+                </Button>
+              )}
+              {showCallButton && (
+                <Button variant="outline" className="flex-1 gap-1.5 px-2" asChild>
+                  <a href={getTelLink(provider.phone as string)}>
+                    <Phone className="h-4 w-4 shrink-0" />
+                    <span className="truncate">
+                      {t("provider.callProvider")}
+                    </span>
+                  </a>
+                </Button>
+              )}
+            </div>
+          )}
           <Button
-            variant="outline"
-            className="flex-1 gap-2"
-            onClick={handleMessage}
-            disabled={createChatMutation.isPending}
-          >
-            <MessageSquare className="h-5 w-5" />
-            {createChatMutation.isPending
-              ? t("common.loading")
-              : t("provider.messageProvider")}
-          </Button>
-          <Button
-            className="flex-1 gap-2"
+            className="w-full gap-2"
             disabled={!selectedService}
             onClick={() =>
               selectedService && handleBookService(selectedService)

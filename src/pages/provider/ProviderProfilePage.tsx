@@ -22,6 +22,9 @@ import {
   MapPin,
   CheckCircle2,
   Flag,
+  MessageCircle,
+  MessageSquare,
+  Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +55,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useGuest } from "@/contexts/GuestContext";
 import { useRequestTrackingConsent } from "@/components/TrackingConsent";
 import { updateUserProfile } from "@/lib/firestore";
+import { DEFAULT_COMMUNICATION_PREFS } from "@/lib/phone";
 import { storage } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { sendEmailVerification } from "firebase/auth";
@@ -382,6 +386,26 @@ const ProviderProfilePage: React.FC = () => {
     ]);
     await refreshUser();
     setIsEditing(false);
+  };
+
+  const communicationPrefs =
+    providerProfile?.communicationPrefs || DEFAULT_COMMUNICATION_PREFS;
+
+  const handleToggleCommunicationPref = async (
+    key: keyof typeof communicationPrefs,
+    checked: boolean,
+  ) => {
+    if (!user) return;
+    const next = { ...communicationPrefs, [key]: checked };
+    try {
+      await updateProviderProfileMutation.mutateAsync({
+        uid: user.uid,
+        updates: { communicationPrefs: next },
+      });
+    } catch (error) {
+      console.error("Failed to update communication preferences:", error);
+      toast.error(t("common.error"));
+    }
   };
 
   const fadeInUp = {
@@ -916,6 +940,70 @@ const ProviderProfilePage: React.FC = () => {
                     <ChevronRight className="h-5 w-5 text-muted-foreground" />
                   </button>
                 </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Communication Preferences */}
+          <motion.div variants={fadeInUp} className="mb-6">
+            <h2 className="mb-3 text-lg font-semibold text-foreground">
+              {t("profile.communicationPrefs")}
+            </h2>
+            <Card>
+              <CardContent className="p-0">
+                <p className="border-b p-4 text-sm text-muted-foreground">
+                  {t("profile.communicationPrefsDescription")}
+                </p>
+
+                <div className="flex items-center justify-between p-4 border-b">
+                  <div className="flex items-center gap-3">
+                    <MessageSquare className="h-5 w-5 text-muted-foreground" />
+                    <span>{t("profile.allowInAppChat")}</span>
+                  </div>
+                  <Switch
+                    checked={communicationPrefs.inAppChat}
+                    disabled={updateProviderProfileMutation.isPending}
+                    onCheckedChange={(checked) =>
+                      handleToggleCommunicationPref("inAppChat", checked)
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border-b">
+                  <div className="flex items-center gap-3">
+                    <MessageCircle className="h-5 w-5 text-green-600" />
+                    <span>{t("profile.showWhatsappButton")}</span>
+                  </div>
+                  <Switch
+                    checked={communicationPrefs.whatsapp}
+                    disabled={updateProviderProfileMutation.isPending}
+                    onCheckedChange={(checked) =>
+                      handleToggleCommunicationPref("whatsapp", checked)
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3">
+                    <Phone className="h-5 w-5 text-muted-foreground" />
+                    <span>{t("profile.showPhoneButton")}</span>
+                  </div>
+                  <Switch
+                    checked={communicationPrefs.phoneCall}
+                    disabled={updateProviderProfileMutation.isPending}
+                    onCheckedChange={(checked) =>
+                      handleToggleCommunicationPref("phoneCall", checked)
+                    }
+                  />
+                </div>
+
+                {(communicationPrefs.whatsapp ||
+                  communicationPrefs.phoneCall) &&
+                  !providerProfile?.phone && (
+                    <p className="border-t bg-amber-500/10 px-4 py-2 text-xs text-amber-600">
+                      {t("profile.communicationPrefsNeedsPhone")}
+                    </p>
+                  )}
               </CardContent>
             </Card>
           </motion.div>

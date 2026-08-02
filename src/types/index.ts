@@ -112,6 +112,15 @@ export interface User {
 }
 
 // Provider profile
+// Which contact methods a provider allows clients to reach them through, in
+// addition to (or instead of) in-app chat. Absent on providers who never
+// touched this setting — treat as chat-only (today's behavior) in that case.
+export interface CommunicationPrefs {
+  inAppChat: boolean;
+  whatsapp: boolean;
+  phoneCall: boolean;
+}
+
 export interface ProviderProfile {
   uid: string;
   displayName?: string;
@@ -120,6 +129,7 @@ export interface ProviderProfile {
   city: string;
   area: string;
   phone?: string;
+  communicationPrefs?: CommunicationPrefs;
   latitude?: number;
   longitude?: number;
   isVerified: boolean; // "Trusted Provider" badge - earned after 10 completed bookings

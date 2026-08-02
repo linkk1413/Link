@@ -270,6 +270,8 @@
     "provider": "Service Provider",
     "messageProvider": "Message Provider",
     "messageClient": "Message Client",
+    "whatsappClient": "WhatsApp",
+    "callClient": "Call",
     "cancelBooking": "Cancel Booking",
     "cancelConfirmTitle": "Cancel this booking?",
     "cancelConfirmDesc": "Are you sure you want to cancel this booking? This action cannot be undone.",
@@ -373,7 +375,13 @@
     "privacy": "Privacy",
     "locationAccess": "Location Access",
     "locationAccessDescription": "Allow the app to use your location for nearby services",
-    "locationAccessRevoked": "Location access revoked"
+    "locationAccessRevoked": "Location access revoked",
+    "communicationPrefs": "Communication Options",
+    "communicationPrefsDescription": "Choose how clients can reach you — you can turn any option on or off at any time.",
+    "allowInAppChat": "Allow in-app chat",
+    "showWhatsappButton": "Show a WhatsApp button to clients",
+    "showPhoneButton": "Show your phone number and allow calls",
+    "communicationPrefsNeedsPhone": "Add your phone number above so clients can actually reach you through this option."
   },
   "help": {
     "title": "Help Center",
@@ -910,6 +918,8 @@
     "availability": "Availability",
     "bookNow": "Book now",
     "messageProvider": "Message",
+    "whatsappProvider": "WhatsApp",
+    "callProvider": "Call",
     "profile": "Provider Profile",
     "provider": "Provider",
     "notFound": "Provider not found",

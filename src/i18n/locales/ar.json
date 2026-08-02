@@ -269,6 +269,8 @@
     "provider": "مقدمة الخدمة",
     "messageProvider": "مراسلة مقدمة الخدمة",
     "messageClient": "مراسلة العميلة",
+    "whatsappClient": "واتساب",
+    "callClient": "اتصال",
     "cancelBooking": "إلغاء الحجز",
     "cancelConfirmTitle": "إلغاء هذا الحجز؟",
     "cancelConfirmDesc": "هل أنتِ متأكدة من إلغاء هذا الحجز؟ لا يمكن التراجع عن هذا الإجراء.",
@@ -371,7 +373,13 @@
     "privacy": "الخصوصية",
     "locationAccess": "الوصول للموقع",
     "locationAccessDescription": "السماح للتطبيق باستخدام موقعك للخدمات القريبة",
-    "locationAccessRevoked": "تم إلغاء الوصول للموقع"
+    "locationAccessRevoked": "تم إلغاء الوصول للموقع",
+    "communicationPrefs": "خيارات التواصل",
+    "communicationPrefsDescription": "حددي طريقة تواصل العميلات معك — يمكنك تفعيل أو إلغاء أي خيار في أي وقت.",
+    "allowInAppChat": "السماح بالمحادثة داخل التطبيق",
+    "showWhatsappButton": "إظهار زر واتساب للعميلات",
+    "showPhoneButton": "إظهار رقم الجوال وإتاحة الاتصال",
+    "communicationPrefsNeedsPhone": "أضيفي رقم جوالك بالأعلى حتى تتمكن العميلات فعليًا من التواصل معك عبر هذا الخيار."
   },
   "help": {
     "title": "مركز المساعدة",
@@ -910,6 +918,8 @@
     "availability": "المواعيد المتاحة",
     "bookNow": "احجزي الآن",
     "messageProvider": "مراسلة",
+    "whatsappProvider": "واتساب",
+    "callProvider": "اتصال",
     "profile": "ملف مقدمة الخدمات",
     "provider": "مقدمة الخدمات",
     "notFound": "لم يتم العثور على مقدمة الخدمات",

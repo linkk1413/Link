@@ -8,6 +8,8 @@ import {
   Clock,
   MapPin,
   MessageCircle,
+  MessageSquare,
+  Phone,
   User,
   CheckCircle,
   XCircle,
@@ -33,6 +35,7 @@ import {
 import { useService } from "@/hooks/queries/useServices";
 import { useCreateChat } from "@/hooks/queries/useChats";
 import { useUser } from "@/hooks/queries/useUsers";
+import { getWhatsappLink, getTelLink } from "@/lib/phone";
 import { BookingStatus } from "@/types";
 
 const getStatusBadgeVariant = (status: BookingStatus) => {
@@ -276,16 +279,42 @@ const ProviderBookingDetailsPage: React.FC = () => {
 
               <Separator className="my-4" />
 
-              {/* Action Button */}
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={handleMessage}
-                disabled={createChatMutation.isPending}
-              >
-                <MessageCircle className="h-4 w-4 mr-2" />
-                {t("bookings.messageClient")}
-              </Button>
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-1.5"
+                  onClick={handleMessage}
+                  disabled={createChatMutation.isPending}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  {t("bookings.messageClient")}
+                </Button>
+                {client?.phone && (
+                  <>
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-1.5 border-green-600/40 text-green-600 hover:bg-green-600/10 hover:text-green-600"
+                      asChild
+                    >
+                      <a
+                        href={getWhatsappLink(client.phone)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        {t("bookings.whatsappClient")}
+                      </a>
+                    </Button>
+                    <Button variant="outline" className="flex-1 gap-1.5" asChild>
+                      <a href={getTelLink(client.phone)}>
+                        <Phone className="h-4 w-4" />
+                        {t("bookings.callClient")}
+                      </a>
+                    </Button>
+                  </>
+                )}
+              </div>
             </CardContent>
           </Card>
         </motion.div>
