@@ -9,11 +9,12 @@ import {
   History,
   Loader2,
   ShieldCheck,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   reauthenticateWithCredential,
   EmailAuthProvider,
-  verifyBeforeUpdateEmail,
   updatePassword,
   updateProfile as updateFirebaseProfile,
 } from "firebase/auth";
@@ -30,6 +31,46 @@ import { useLoginHistory } from "@/hooks/queries/useUsers";
 
 const isStrongPassword = (value: string) =>
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(value);
+
+const apiBaseUrl =
+  import.meta.env.VITE_MOYASAR_API_BASE_URL ||
+  import.meta.env.VITE_PAYPAL_API_BASE_URL ||
+  "";
+
+const PasswordField: React.FC<{
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}> = ({ id, label, value, onChange }) => {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="relative">
+        <Input
+          id={id}
+          type={visible ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="pe-10"
+        />
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          tabIndex={-1}
+        >
+          {visible ? (
+            <EyeOff className="h-4 w-4" />
+          ) : (
+            <Eye className="h-4 w-4" />
+          )}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const AdminAccountPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -80,7 +121,25 @@ const AdminAccountPage: React.FC = () => {
     setIsSendingEmailChange(true);
     try {
       await reauth(emailPassword);
-      await verifyBeforeUpdateEmail(firebaseUser, newEmail.trim());
+      // The verification link is generated server-side (Admin SDK) and sent
+      // through our own Resend pipeline instead of Firebase's own email
+      // delivery, which isn't reliably configured for this project.
+      const idToken = await firebaseUser.getIdToken();
+      const res = await fetch(
+        `${apiBaseUrl}/api/auth/send-change-email-verification`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ newEmail: newEmail.trim() }),
+        },
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to send verification email");
+      }
       toast.success(t("adminAccount.emailChangeSent"));
       setNewEmail("");
       setEmailPassword("");
@@ -88,8 +147,6 @@ const AdminAccountPage: React.FC = () => {
       const code = (error as { code?: string })?.code;
       if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
         toast.error(t("adminAccount.wrongCurrentPassword"));
-      } else if (code === "auth/email-already-in-use") {
-        toast.error(t("auth.errors.emailInUse"));
       } else {
         console.error("Failed to start email change:", error);
         toast.error(t("common.error"));
@@ -117,6 +174,18 @@ const AdminAccountPage: React.FC = () => {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+
+      // Best-effort confirmation email — the password change itself already
+      // succeeded above, so a failure here shouldn't be shown as an error.
+      try {
+        const idToken = await firebaseUser.getIdToken();
+        await fetch(`${apiBaseUrl}/api/auth/notify-password-changed`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+      } catch (notifyError) {
+        console.error("Failed to send password-changed notice:", notifyError);
+      }
     } catch (error: unknown) {
       const code = (error as { code?: string })?.code;
       if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
@@ -237,17 +306,12 @@ const AdminAccountPage: React.FC = () => {
                   placeholder="you@example.com"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email-current-password">
-                  {t("adminAccount.currentPassword")}
-                </Label>
-                <Input
-                  id="email-current-password"
-                  type="password"
-                  value={emailPassword}
-                  onChange={(e) => setEmailPassword(e.target.value)}
-                />
-              </div>
+              <PasswordField
+                id="email-current-password"
+                label={t("adminAccount.currentPassword")}
+                value={emailPassword}
+                onChange={setEmailPassword}
+              />
               <Button
                 onClick={handleChangeEmail}
                 disabled={
@@ -273,40 +337,29 @@ const AdminAccountPage: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <PasswordField
+                id="current-password"
+                label={t("adminAccount.currentPassword")}
+                value={currentPassword}
+                onChange={setCurrentPassword}
+              />
               <div className="space-y-2">
-                <Label htmlFor="current-password">
-                  {t("adminAccount.currentPassword")}
-                </Label>
-                <Input
-                  id="current-password"
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="new-password">{t("adminAccount.newPassword")}</Label>
-                <Input
+                <PasswordField
                   id="new-password"
-                  type="password"
+                  label={t("adminAccount.newPassword")}
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  onChange={setNewPassword}
                 />
                 <p className="text-xs text-muted-foreground">
                   {t("auth.passwordRequirements")}
                 </p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirm-password">
-                  {t("adminAccount.confirmPassword")}
-                </Label>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                />
-              </div>
+              <PasswordField
+                id="confirm-password"
+                label={t("adminAccount.confirmPassword")}
+                value={confirmPassword}
+                onChange={setConfirmPassword}
+              />
               <Button
                 onClick={handleChangePassword}
                 disabled={

@@ -1,6 +1,7 @@
 const express = require("express");
 const admin = require("../firebaseAdmin");
 const { sendEmail, emailTemplates } = require("../services/email");
+const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
 const db = admin.firestore();
@@ -200,6 +201,75 @@ router.post("/send-payment-confirmation", async (req, res) => {
   } catch (error) {
     console.error("Error sending payment confirmation:", error);
     res.status(500).json({ error: "Failed to send payment confirmation" });
+  }
+});
+
+// Confirm a requested email change (admin self-service account page). The
+// verification link is generated ourselves via the Admin SDK and sent
+// through our own Resend pipeline instead of relying on Firebase's own
+// (unconfigured) "email address change" template. Requires the caller's own
+// verified ID token — the current email always comes from Admin SDK, never
+// the request body, so this can't be used to send a change link for anyone
+// else's account.
+router.post("/send-change-email-verification", requireAuth, async (req, res) => {
+  try {
+    const { newEmail } = req.body;
+    if (!newEmail) {
+      return res.status(400).json({ error: "newEmail is required" });
+    }
+
+    const userRecord = await admin.auth().getUser(req.uid);
+    if (!userRecord.email) {
+      return res.status(400).json({ error: "Account has no current email" });
+    }
+
+    const verifyLink = await admin
+      .auth()
+      .generateVerifyAndChangeEmailLink(userRecord.email, newEmail);
+
+    const template = emailTemplates.changeEmailVerification(
+      userRecord.displayName || newEmail.split("@")[0],
+      verifyLink,
+    );
+
+    await sendEmail({ to: newEmail, subject: template.subject, html: template.html });
+
+    res.json({ success: true, message: "Verification email sent" });
+  } catch (error) {
+    console.error("Error sending change-email verification:", error);
+    if (error.code === "auth/email-already-exists") {
+      return res.status(409).json({ error: "Email already in use" });
+    }
+    res.status(500).json({ error: "Failed to send verification email" });
+  }
+});
+
+// Confirmation email after an in-app password change. The change already
+// happened client-side (Firebase Auth updatePassword) before this is
+// called — this just closes the loop with a notice to the real address on
+// file, looked up via Admin SDK.
+router.post("/notify-password-changed", requireAuth, async (req, res) => {
+  try {
+    const userRecord = await admin.auth().getUser(req.uid);
+    if (!userRecord.email) {
+      return res.json({ success: true, message: "No email on file" });
+    }
+
+    const template = emailTemplates.passwordChanged(
+      userRecord.displayName || userRecord.email.split("@")[0],
+      `${CLIENT_APP_URL}/auth/forgot-password`,
+    );
+
+    await sendEmail({
+      to: userRecord.email,
+      subject: template.subject,
+      html: template.html,
+    });
+
+    res.json({ success: true, message: "Notification sent" });
+  } catch (error) {
+    console.error("Error sending password-changed notification:", error);
+    res.status(500).json({ error: "Failed to send notification" });
   }
 });
 

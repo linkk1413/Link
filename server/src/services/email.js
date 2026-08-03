@@ -119,6 +119,42 @@ const emailTemplates = {
     `,
   }),
 
+  // Confirm a requested email address change (admin self-service account page)
+  changeEmailVerification: (name, verifyLink) => ({
+    subject: "Confirm Your New Email Address",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #333; margin-bottom: 20px;">Confirm Your New Email</h1>
+        <p>Hi ${name},</p>
+        <p>A request was made to change the email address on your Link account to this one. Click below to confirm it:</p>
+        <div style="margin: 30px 0;">
+          <a href="${verifyLink}" style="background-color: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            Confirm New Email
+          </a>
+        </div>
+        <p>Or copy this link: <br><code style="background-color: #f4f4f4; padding: 5px 10px; border-radius: 3px; word-break: break-all;">${verifyLink}</code></p>
+        <p style="color: #666; font-size: 14px;">Your email won't change until you click this link. If you didn't request this, you can safely ignore this message.</p>
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+        <p style="color: #999; font-size: 12px;">© 2026 Link. All rights reserved.</p>
+      </div>
+    `,
+  }),
+
+  // Security notice after an in-app password change
+  passwordChanged: (name, forgotPasswordLink) => ({
+    subject: "Your Password Was Changed",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #333; margin-bottom: 20px;">Password Changed</h1>
+        <p>Hi ${name},</p>
+        <p>This confirms the password on your Link account was just changed.</p>
+        <p style="color: #666; font-size: 14px;">If this was you, no further action is needed. If you didn't make this change, reset your password immediately: <br><a href="${forgotPasswordLink}">${forgotPasswordLink}</a></p>
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+        <p style="color: #999; font-size: 12px;">© 2026 Link. All rights reserved.</p>
+      </div>
+    `,
+  }),
+
   // Internal admin notification for a provider subscription payment
   adminSubscriptionNotification: (
     providerName,
