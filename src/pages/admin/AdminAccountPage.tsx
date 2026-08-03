@@ -116,6 +116,18 @@ const AdminAccountPage: React.FC = () => {
     }
   };
 
+  // Surfaces the real underlying error text instead of a generic message —
+  // the admin explicitly needs to see why something failed, not just that
+  // it did.
+  const describeError = (error: unknown): string => {
+    const code = (error as { code?: string })?.code;
+    if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
+      return t("adminAccount.wrongCurrentPassword");
+    }
+    const message = (error as { message?: string })?.message;
+    return message ? `${t("common.error")}: ${message}` : t("common.error");
+  };
+
   const handleChangeEmail = async () => {
     if (!firebaseUser || !newEmail.trim() || !emailPassword) return;
     setIsSendingEmailChange(true);
@@ -136,28 +148,23 @@ const AdminAccountPage: React.FC = () => {
           body: JSON.stringify({ newEmail: newEmail.trim() }),
         },
       );
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to send verification email");
+        throw new Error(data.error || `Request failed (${res.status})`);
       }
       toast.success(t("adminAccount.emailChangeSent"));
       setNewEmail("");
       setEmailPassword("");
     } catch (error: unknown) {
-      const code = (error as { code?: string })?.code;
-      if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
-        toast.error(t("adminAccount.wrongCurrentPassword"));
-      } else {
-        console.error("Failed to start email change:", error);
-        toast.error(t("common.error"));
-      }
+      console.error("Failed to start email change:", error);
+      toast.error(describeError(error));
     } finally {
       setIsSendingEmailChange(false);
     }
   };
 
   const handleChangePassword = async () => {
-    if (!firebaseUser || !currentPassword || !newPassword) return;
+    if (!firebaseUser?.email || !currentPassword || !newPassword) return;
     if (!isStrongPassword(newPassword)) {
       toast.error(t("auth.passwordRequirements"));
       return;
@@ -167,35 +174,62 @@ const AdminAccountPage: React.FC = () => {
       return;
     }
     setIsChangingPassword(true);
+
     try {
       await reauth(currentPassword);
-      await updatePassword(firebaseUser, newPassword);
-      toast.success(t("adminAccount.passwordChanged"));
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-
-      // Best-effort confirmation email — the password change itself already
-      // succeeded above, so a failure here shouldn't be shown as an error.
-      try {
-        const idToken = await firebaseUser.getIdToken();
-        await fetch(`${apiBaseUrl}/api/auth/notify-password-changed`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-      } catch (notifyError) {
-        console.error("Failed to send password-changed notice:", notifyError);
-      }
     } catch (error: unknown) {
-      const code = (error as { code?: string })?.code;
-      if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
-        toast.error(t("adminAccount.wrongCurrentPassword"));
-      } else {
-        console.error("Failed to change password:", error);
-        toast.error(t("common.error"));
-      }
-    } finally {
+      console.error("Failed to re-authenticate before password change:", error);
+      toast.error(describeError(error));
       setIsChangingPassword(false);
+      return;
+    }
+
+    try {
+      await updatePassword(firebaseUser, newPassword);
+    } catch (error: unknown) {
+      console.error("updatePassword call failed:", error);
+      toast.error(describeError(error));
+      setIsChangingPassword(false);
+      return;
+    }
+
+    // Don't trust that updatePassword() resolving means the change actually
+    // stuck — confirm it by re-authenticating with the NEW password before
+    // telling the admin it worked. If this fails, the update did not really
+    // take effect server-side even though the call above didn't throw.
+    try {
+      const verifyCredential = EmailAuthProvider.credential(
+        firebaseUser.email,
+        newPassword,
+      );
+      await reauthenticateWithCredential(firebaseUser, verifyCredential);
+    } catch (error: unknown) {
+      console.error(
+        "Password change could not be verified after updatePassword succeeded:",
+        error,
+      );
+      toast.error(t("adminAccount.passwordVerifyFailed"));
+      setIsChangingPassword(false);
+      return;
+    }
+
+    toast.success(t("adminAccount.passwordChanged"));
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setIsChangingPassword(false);
+
+    // Best-effort confirmation email — the password change itself is
+    // already verified above, so a failure here shouldn't be shown as an
+    // error.
+    try {
+      const idToken = await firebaseUser.getIdToken();
+      await fetch(`${apiBaseUrl}/api/auth/notify-password-changed`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+    } catch (notifyError) {
+      console.error("Failed to send password-changed notice:", notifyError);
     }
   };
 

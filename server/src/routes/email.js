@@ -240,7 +240,12 @@ router.post("/send-change-email-verification", requireAuth, async (req, res) => 
     if (error.code === "auth/email-already-exists") {
       return res.status(409).json({ error: "Email already in use" });
     }
-    res.status(500).json({ error: "Failed to send verification email" });
+    // Surface the real reason (Admin SDK / IAM / Resend error) instead of a
+    // generic message — this is an authenticated admin-only endpoint, so
+    // there's no user-facing information-disclosure risk in exposing it.
+    res.status(500).json({
+      error: error.message || "Failed to send verification email",
+    });
   }
 });
 
@@ -269,7 +274,9 @@ router.post("/notify-password-changed", requireAuth, async (req, res) => {
     res.json({ success: true, message: "Notification sent" });
   } catch (error) {
     console.error("Error sending password-changed notification:", error);
-    res.status(500).json({ error: "Failed to send notification" });
+    res.status(500).json({
+      error: error.message || "Failed to send notification",
+    });
   }
 });
 

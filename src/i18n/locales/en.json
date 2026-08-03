@@ -1254,6 +1254,7 @@
     "passwordsDontMatch": "The new password and confirmation don't match.",
     "passwordChanged": "Password changed successfully.",
     "wrongCurrentPassword": "Current password is incorrect.",
+    "passwordVerifyFailed": "The password change could not be confirmed. Please try again, and if it keeps happening, contact support.",
     "security": "Security",
     "lastLogin": "Last login",
     "lastLoginDevice": "Last login device",
