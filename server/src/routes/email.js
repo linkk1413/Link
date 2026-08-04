@@ -37,7 +37,9 @@ router.post("/send-reset-email", async (req, res) => {
     res.json({ success: true, message: "Password reset email sent" });
   } catch (error) {
     console.error("Error sending password reset email:", error);
-    res.status(500).json({ error: "Failed to send password reset email" });
+    res.status(500).json({
+      error: error.message || "Failed to send password reset email",
+    });
   }
 });
 
@@ -65,7 +67,9 @@ router.post("/send-verification-email", async (req, res) => {
     res.json({ success: true, message: "Verification email sent" });
   } catch (error) {
     console.error("Error sending verification email:", error);
-    res.status(500).json({ error: "Failed to send verification email" });
+    res.status(500).json({
+      error: error.message || "Failed to send verification email",
+    });
   }
 });
 
@@ -142,7 +146,9 @@ router.post("/send-booking-confirmation", async (req, res) => {
     res.json({ success: true, message: "Booking confirmation sent" });
   } catch (error) {
     console.error("Error sending booking confirmation:", error);
-    res.status(500).json({ error: "Failed to send booking confirmation" });
+    res.status(500).json({
+      error: error.message || "Failed to send booking confirmation",
+    });
   }
 });
 
@@ -200,7 +206,9 @@ router.post("/send-payment-confirmation", async (req, res) => {
     res.json({ success: true, message: "Payment confirmation sent" });
   } catch (error) {
     console.error("Error sending payment confirmation:", error);
-    res.status(500).json({ error: "Failed to send payment confirmation" });
+    res.status(500).json({
+      error: error.message || "Failed to send payment confirmation",
+    });
   }
 });
 
@@ -325,7 +333,9 @@ router.post("/notify-admin-subscription", async (req, res) => {
     res.json({ success: true, message: "Admin notification sent" });
   } catch (error) {
     console.error("Error sending admin notification:", error);
-    res.status(500).json({ error: "Failed to send admin notification" });
+    res.status(500).json({
+      error: error.message || "Failed to send admin notification",
+    });
   }
 });
 
