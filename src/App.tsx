@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner, toast } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +13,7 @@ import { auth } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { getAuthErrorMessage } from "@/lib/authErrors";
 import { TrackingConsent } from "@/components/TrackingConsent";
+import { SplashScreen } from "@/components/SplashScreen";
 
 // Layouts
 import { ClientLayout } from "@/components/layout/ClientLayout";
@@ -281,25 +282,38 @@ const VerifyEmailBanner = () => {
   );
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-      <AuthProvider>
-        <GuestProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <TrackingConsent>
-                <VerifyEmailBanner />
-                <AppRoutes />
-              </TrackingConsent>
-            </BrowserRouter>
-          </TooltipProvider>
-        </GuestProvider>
-      </AuthProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  // Shown once per app launch, on top of everything else, with no way to
+  // dismiss it early — it only goes away on its own timer (see
+  // SplashScreen). The app underneath still mounts and resolves its
+  // routing while the splash is up, so there's no extra delay once it
+  // fades out.
+  const [showSplash, setShowSplash] = useState(true);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+        <AuthProvider>
+          <GuestProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <SplashScreen
+                visible={showSplash}
+                onFinish={() => setShowSplash(false)}
+              />
+              <BrowserRouter>
+                <TrackingConsent>
+                  <VerifyEmailBanner />
+                  <AppRoutes />
+                </TrackingConsent>
+              </BrowserRouter>
+            </TooltipProvider>
+          </GuestProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
