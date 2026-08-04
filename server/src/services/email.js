@@ -7,8 +7,16 @@ const senderEmail = process.env.SENDER_EMAIL || "noreply@link-22.com";
 
 const sendEmail = async (params) => {
   if (!resend) {
-    console.warn("Email service not configured (RESEND_API_KEY missing). Email not sent.");
-    return { data: { id: "skipped" }, error: null };
+    // This used to return a fake success here so a missing key wouldn't
+    // crash local dev — but that meant a misconfigured production deploy
+    // silently "sent" nothing while every caller believed the email went
+    // out. Failing loudly is safer: every route already surfaces
+    // error.message to its caller, so this becomes a real, diagnosable
+    // error instead of an invisible no-op.
+    const message =
+      "Email service not configured (RESEND_API_KEY missing on this server)";
+    console.error(message);
+    throw new Error(message);
   }
   
   try {

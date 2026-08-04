@@ -12,6 +12,11 @@ import { auth } from "@/lib/firebase";
 import { getAuthErrorMessage } from "@/lib/authErrors";
 import logo from "@/assets/logo.jpeg";
 
+const apiBaseUrl =
+  import.meta.env.VITE_MOYASAR_API_BASE_URL ||
+  import.meta.env.VITE_PAYPAL_API_BASE_URL ||
+  "";
+
 const ForgotPasswordPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -36,7 +41,7 @@ const ForgotPasswordPage: React.FC = () => {
       // Also send reset email via our backend (Resend). The server builds
       // the actual link itself — it will not accept one from us.
       try {
-        await fetch("/api/auth/send-reset-email", {
+        await fetch(`${apiBaseUrl}/api/auth/send-reset-email`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

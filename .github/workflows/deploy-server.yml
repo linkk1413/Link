@@ -51,5 +51,5 @@ jobs:
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "PAYPAL_ENV=live,CLIENT_ORIGIN=https://www.link-22.com|https://link-22.com" \
+            --set-env-vars "PAYPAL_ENV=live,CLIENT_ORIGIN=https://www.link-22.com|https://link-22.com,RESEND_API_KEY=${{ secrets.RESEND_API_KEY }},SENDER_EMAIL=${{ secrets.SENDER_EMAIL }},CLIENT_APP_URL=https://www.link-22.com,ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}" \
             --set-secrets "PAYPAL_CLIENT_ID=PAYPAL_CLIENT_ID:latest,PAYPAL_CLIENT_SECRET=PAYPAL_CLIENT_SECRET:latest,MOYASAR_SECRET_KEY=MOYASAR_SECRET_KEY:latest,MOYASAR_WEBHOOK_SECRET=MOYASAR_WEBHOOK_SECRET:latest"

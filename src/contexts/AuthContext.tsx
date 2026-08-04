@@ -49,12 +49,13 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ uid: string; email: string }>;
   verifyLoginOtp: (uid: string, code: string) => Promise<void>;
   resendLoginOtp: (uid: string) => Promise<void>;
+  // Also gated behind the same OTP flow as login — see login()'s comment.
   signup: (
     email: string,
     password: string,
     name: string,
     phone: string,
-  ) => Promise<void>;
+  ) => Promise<{ uid: string; email: string }>;
   logout: () => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
   setUserRole: (role: UserRole) => Promise<void>;
@@ -288,7 +289,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // server builds the actual link itself from this code — it will not
         // accept a full link from us.
         try {
-          await fetch("/api/auth/send-verification-email", {
+          await fetch(`${apiBaseUrl}/api/auth/send-verification-email`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -311,8 +312,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       // Create user document in Firestore
-      const newUser = await createUserDocument(fbUser.uid, email, name, phone);
-      setUser(newUser);
+      await createUserDocument(fbUser.uid, email, name, phone);
+
+      // A brand-new account clears the same OTP gate as any other login —
+      // see login() for why the session is destroyed immediately after.
+      const idToken = await fbUser.getIdToken();
+      const otpRes = await fetch(`${apiBaseUrl}/api/auth/send-otp`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      if (!otpRes.ok) {
+        const data = await otpRes.json().catch(() => ({}));
+        await signOut(auth);
+        throw new Error(data.error || "Failed to send verification code");
+      }
+
+      const pendingUid = fbUser.uid;
+      const pendingEmail = fbUser.email || email;
+      await signOut(auth);
+
+      return { uid: pendingUid, email: pendingEmail };
     } catch (error: unknown) {
       console.error("Signup error:", error);
       // If we created an auth user but something else failed, clean up

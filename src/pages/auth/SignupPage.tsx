@@ -82,8 +82,8 @@ const SignupPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await signup(email, password, name, normalizedPhone);
-      navigate("/onboarding");
+      const pending = await signup(email, password, name, normalizedPhone);
+      navigate("/auth/verify-otp", { state: pending });
     } catch (err) {
       if ((err as { code?: string })?.code === "auth/email-not-verified") {
         setSuccess(t("auth.verifyEmailSent"));
