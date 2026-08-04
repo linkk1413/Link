@@ -90,7 +90,12 @@ router.post("/resend-otp", async (req, res) => {
       }
     }
 
-    const userRecord = await admin.auth().getUser(uid);
+    let userRecord;
+    try {
+      userRecord = await admin.auth().getUser(uid);
+    } catch {
+      return res.status(400).json({ error: "No pending login for this account" });
+    }
     if (!userRecord.email) {
       return res.status(400).json({ error: "Account has no email on file" });
     }
