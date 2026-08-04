@@ -119,6 +119,31 @@ const emailTemplates = {
     `,
   }),
 
+  // Login verification code (email 2FA) — sent on every password sign-in
+  loginOtp: (name, code, logoUrl) => ({
+    subject: "Your Link Login Verification Code",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <img src="${logoUrl}" alt="Link" style="height: 48px; width: 48px; border-radius: 12px;" />
+        </div>
+        <h1 style="color: #333; margin-bottom: 20px; text-align: center;">Login Verification Code</h1>
+        <p>Hi ${name},</p>
+        <p>Use the code below to finish signing in to your Link account:</p>
+        <div style="margin: 30px 0; text-align: center;">
+          <span style="display: inline-block; background-color: #f4f4f4; padding: 16px 32px; border-radius: 8px; font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #111;">
+            ${code}
+          </span>
+        </div>
+        <p style="color: #666; font-size: 14px;">This code is valid for <strong>10 minutes</strong> only.</p>
+        <p style="color: #c0392b; font-size: 14px;"><strong>Never share this code with anyone</strong> — Link staff will never ask you for it.</p>
+        <p style="color: #666; font-size: 14px;">If you didn't try to log in, you can ignore this email and consider changing your password.</p>
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+        <p style="color: #999; font-size: 12px;">© 2026 Link. All rights reserved.</p>
+      </div>
+    `,
+  }),
+
   // Confirm a requested email address change (admin self-service account page)
   changeEmailVerification: (name, verifyLink) => ({
     subject: "Confirm Your New Email Address",

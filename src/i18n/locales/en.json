@@ -101,6 +101,17 @@
     "createAccount": "Create account",
     "welcomeBack": "Welcome back",
     "getStarted": "Get started",
+    "otp": {
+      "title": "Verify Your Identity",
+      "subtitle": "We've sent a 6-digit code to {{email}}",
+      "codeLabel": "Verification code",
+      "expiryNote": "This code is valid for 10 minutes.",
+      "verify": "Verify & Continue",
+      "resend": "Resend code",
+      "resendIn": "Resend code in {{seconds}}s",
+      "invalidLength": "Enter the 6-digit code from your email.",
+      "heroSubtitle": "An extra layer of protection for your account."
+    },
     "errors": {
       "emailInUse": "This email is already registered. Try logging in instead.",
       "invalidEmail": "Please enter a valid email address.",

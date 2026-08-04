@@ -25,6 +25,7 @@ import LandingPage from "@/pages/LandingPage";
 import PrivacyPolicyPage from "@/pages/PrivacyPolicyPage";
 import TermsOfServicePage from "@/pages/TermsOfServicePage";
 import LoginPage from "@/pages/auth/LoginPage";
+import VerifyLoginOtpPage from "@/pages/auth/VerifyLoginOtpPage";
 import SignupPage from "@/pages/auth/SignupPage";
 import ForgotPasswordPage from "@/pages/auth/ForgotPasswordPage";
 import OnboardingPage from "@/pages/OnboardingPage";
@@ -131,6 +132,7 @@ const AppRoutes = () => {
       {/* Public routes */}
       <Route path="/" element={<RoleBasedRedirect />} />
       <Route path="/auth/login" element={<LoginPage />} />
+      <Route path="/auth/verify-otp" element={<VerifyLoginOtpPage />} />
       <Route path="/auth/signup" element={<SignupPage />} />
       <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/help" element={<HelpCenterPage />} />

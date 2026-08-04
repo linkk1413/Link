@@ -39,9 +39,10 @@ const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await login(email, password);
-      // Navigate to root - RoleBasedRedirect will handle routing based on user's role
-      navigate("/");
+      const pending = await login(email, password);
+      // Password verified — a one-time code was just emailed. The login
+      // isn't actually complete until it's confirmed on the next screen.
+      navigate("/auth/verify-otp", { state: pending });
     } catch (err) {
       setError(getAuthErrorMessage(err, t));
     } finally {

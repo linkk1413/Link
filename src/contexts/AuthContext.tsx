@@ -8,6 +8,7 @@ import React, {
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithCustomToken,
   createUserWithEmailAndPassword,
   signOut,
   sendEmailVerification,
@@ -32,12 +33,22 @@ import {
 } from "@/lib/firestore";
 import { User, UserRole } from "@/types";
 
+const apiBaseUrl =
+  import.meta.env.VITE_MOYASAR_API_BASE_URL ||
+  import.meta.env.VITE_PAYPAL_API_BASE_URL ||
+  "";
+
 interface AuthContextType {
   user: User | null;
   firebaseUser: FirebaseUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  // Verifies the password and emails a one-time login code — does NOT sign
+  // the caller in. Resolves with the pending account's uid/email; the
+  // caller must then call verifyLoginOtp to actually complete sign-in.
+  login: (email: string, password: string) => Promise<{ uid: string; email: string }>;
+  verifyLoginOtp: (uid: string, code: string) => Promise<void>;
+  resendLoginOtp: (uid: string) => Promise<void>;
   signup: (
     email: string,
     password: string,
@@ -140,7 +151,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const fbUser = userCredential.user;
 
       // Get user document from Firestore
-      const userDoc = await getUserDocument(fbUser.uid);
+      let userDoc = await getUserDocument(fbUser.uid);
 
       if (userDoc && userDoc.status && userDoc.status !== "ACTIVE") {
         await signOut(auth);
@@ -153,25 +164,88 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
       }
 
-      // Non-blocking: don't fail login if this write fails.
-      updateLastLogin(fbUser.uid).catch(console.error);
-
-      if (userDoc) {
-        setUser(userDoc);
-      } else {
+      if (!userDoc) {
         // Create user document if it doesn't exist (edge case)
-        const newUser = await createUserDocument(
+        userDoc = await createUserDocument(
           fbUser.uid,
           fbUser.email || email,
           fbUser.displayName || email.split("@")[0],
         );
-        setUser(newUser);
       }
+
+      // Password is correct and the account is active — but every login
+      // requires a second factor before it's usable. Email a one-time code
+      // and destroy this session immediately: no Firestore access is
+      // possible for this account until verifyLoginOtp succeeds, so there's
+      // no way to bypass the code screen by, say, using devtools directly
+      // against Firestore while "logged in but unverified".
+      const idToken = await fbUser.getIdToken();
+      const res = await fetch(`${apiBaseUrl}/api/auth/send-otp`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        await signOut(auth);
+        throw new Error(data.error || "Failed to send verification code");
+      }
+
+      const pendingUid = fbUser.uid;
+      const pendingEmail = fbUser.email || email;
+      await signOut(auth);
+
+      return { uid: pendingUid, email: pendingEmail };
     } catch (error) {
       console.error("Login error:", error);
       throw error;
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const verifyLoginOtp = async (uid: string, code: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/auth/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid, code }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.customToken) {
+        throw new Error(data.error || "Invalid or expired code");
+      }
+
+      await signInWithCustomToken(auth, data.customToken);
+
+      // Set the user doc ourselves rather than waiting on the
+      // onAuthStateChanged listener's own (also-triggered) fetch, so the
+      // caller can navigate immediately after this resolves without a
+      // flash of "signed in but no role yet".
+      const userDoc = await getUserDocument(uid);
+      if (userDoc) {
+        setUser(userDoc);
+      }
+
+      // Non-blocking: don't fail login if this write fails.
+      updateLastLogin(uid).catch(console.error);
+    } catch (error) {
+      console.error("OTP verification error:", error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resendLoginOtp = async (uid: string) => {
+    const res = await fetch(`${apiBaseUrl}/api/auth/resend-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to resend code");
     }
   };
 
@@ -406,6 +480,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isLoading,
         isAuthenticated: !!user,
         login,
+        verifyLoginOtp,
+        resendLoginOtp,
         signup,
         logout,
         deleteAccount,

@@ -78,9 +78,12 @@ export const getAuthErrorMessage = (
         "Network error. Please check your connection."
       );
 
-    // Default
-    default:
+    // Default — surface the real message when there is one (e.g. errors
+    // thrown from our own server calls) instead of a generic string.
+    default: {
       console.error("Unhandled auth error:", errorCode, error);
-      return t("common.error") || "Something went wrong. Please try again.";
+      const message = (error as { message?: string })?.message;
+      return message || t("common.error") || "Something went wrong. Please try again.";
+    }
   }
 };

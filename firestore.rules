@@ -96,6 +96,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Login OTP codes (email 2FA). Server-only — the client never reads or
+    // writes this directly, only through the authenticated /api/auth/*-otp
+    // endpoints (Admin SDK bypasses these rules). Never expose the code
+    // hash or attempt count to any client.
+    match /otpCodes/{uid} {
+      allow read, write: if false;
+    }
+
     // Lightweight sign-in audit trail, written by the account holder
     // themselves right after each successful login (see updateLastLogin).
     // Append-only — not even the owner may edit or delete an entry.

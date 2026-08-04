@@ -4,6 +4,7 @@ const cors = require("cors");
 const fetch = global.fetch || require("node-fetch");
 const Stripe = require("stripe");
 const emailRouter = require("./src/routes/email");
+const otpRouter = require("./src/routes/otp");
 const moyasarRouter = require("./src/routes/moyasar");
 const { rateLimit } = require("./src/middleware/rateLimit");
 
@@ -329,6 +330,7 @@ app.use(
   "/api/auth",
   rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }),
   emailRouter,
+  otpRouter,
 );
 
 app.listen(PORT, "0.0.0.0", () => {
