@@ -22,7 +22,6 @@ import { AdminLayout } from "@/components/layout/AdminLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 // Pages
-import LandingPage from "@/pages/LandingPage";
 import PrivacyPolicyPage from "@/pages/PrivacyPolicyPage";
 import TermsOfServicePage from "@/pages/TermsOfServicePage";
 import LoginPage from "@/pages/auth/LoginPage";
@@ -100,7 +99,7 @@ const RoleBasedRedirect = () => {
   }
 
   if (!isAuthenticated) {
-    return <LandingPage />;
+    return <Navigate to="/auth/login" replace />;
   }
 
   // Use activeRole for navigation

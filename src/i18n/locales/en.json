@@ -100,6 +100,10 @@
     "dontHaveAccount": "Don't have an account?",
     "createAccount": "Create account",
     "welcomeBack": "Welcome back",
+    "heroLine1": "Bringing together those who create",
+    "heroLine2": "and those who search for",
+    "heroHighlight": "creativity",
+    "heroSubtitle": "A platform connecting clients and service providers for an easier, more professional experience.",
     "getStarted": "Get started",
     "otp": {
       "title": "Verify Your Identity",
@@ -594,29 +598,6 @@
     "blockedDayHint": "You won't be bookable during this time on this date, even if it's normally a working day.",
     "extraDayHint": "You'll be bookable during this extra time on this date, even if it's normally a day off.",
     "exceptionTimeOrderError": "End time must be after start time."
-  },
-  "landing": {
-    "heroTitle": "Your trusted connection to",
-    "heroHighlight": "quality services",
-    "heroSubtitle": "Discover and book verified female service providers in your city. Safe, easy, and reliable.",
-    "getStarted": "Get started",
-    "learnMore": "Learn more",
-    "forClients": "For Clients",
-    "forProviders": "For Providers",
-    "clientBenefit1": "Find trusted providers",
-    "clientBenefit2": "Easy booking & payments",
-    "clientBenefit3": "Secure in-app messaging",
-    "providerBenefit1": "Grow your business",
-    "providerBenefit2": "Manage bookings easily",
-    "providerBenefit3": "Get paid securely"
-  },
-  "footer": {
-    "privacy": "Privacy Policy",
-    "terms": "Terms of Service",
-    "help": "Help Center",
-    "contact": "Contact Us",
-    "rights": "All rights reserved.",
-    "location": "Kingdom of Saudi Arabia"
   },
   "admin": {
     "title": "Admin",

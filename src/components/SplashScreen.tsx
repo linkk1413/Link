@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sparkle } from "lucide-react";
 import logo from "@/assets/logo.jpeg";
 
-const DISPLAY_MS = 1500;
+const DISPLAY_MS = 2500;
 const BACKGROUND_COLOR = "#B5697D";
 
 interface SplashScreenProps {
