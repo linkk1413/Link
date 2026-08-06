@@ -17,8 +17,8 @@ interface BannerSliderProps {
 
 const AUTOPLAY_MS = 4000;
 
-// Full-bleed, edge-to-edge promotional slider for the home screen. Renders
-// nothing when there's no admin-configured slide — no placeholder content.
+// Promotional slider card for the home screen. Renders nothing when there's
+// no admin-configured slide — no placeholder content.
 export const BannerSlider: React.FC<BannerSliderProps> = ({
   slides,
   isActive,
@@ -69,7 +69,7 @@ export const BannerSlider: React.FC<BannerSliderProps> = ({
   if (!isActive || !slides || slides.length === 0) return null;
 
   return (
-    <div className="relative -mx-4 mb-6 overflow-hidden">
+    <div className="relative mb-6 overflow-hidden rounded-2xl">
       <Carousel
         setApi={setApi}
         opts={{ loop: slides.length > 1, direction: isRTL ? "rtl" : "ltr" }}
@@ -81,12 +81,12 @@ export const BannerSlider: React.FC<BannerSliderProps> = ({
                 type="button"
                 onClick={() => slide.linkUrl && navigate(slide.linkUrl)}
                 disabled={!slide.linkUrl}
-                className="block w-full"
+                className="block w-full bg-muted"
               >
                 <img
                   src={slide.imageUrl}
                   alt=""
-                  className="aspect-[16/9] w-full object-cover"
+                  className="aspect-[2/1] w-full object-contain"
                 />
               </button>
             </CarouselItem>

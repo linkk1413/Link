@@ -1,11 +1,10 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeftRight, LogOut, MessageCircle } from "lucide-react";
+import { ArrowLeftRight, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGuest } from "@/contexts/GuestContext";
@@ -19,7 +18,7 @@ interface HomeHeaderProps {
 export const HomeHeader: React.FC<HomeHeaderProps> = ({ roleLabel }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user, logout, switchRole } = useAuth();
+  const { user, switchRole } = useAuth();
   const { isGuest } = useGuest();
 
   const activeRole: UserRole = roleLabel === "client" ? "CLIENT" : "PROVIDER";
@@ -38,10 +37,6 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({ roleLabel }) => {
     } catch (error) {
       console.error("Failed to switch role:", error);
     }
-  };
-
-  const handleLogout = async () => {
-    await logout();
   };
 
   return (
@@ -103,17 +98,6 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({ roleLabel }) => {
             </Button>
           )}
           {!isGuest && <NotificationBell />}
-          <LanguageSwitcher />
-          {!isGuest && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleLogout}
-              title={t("auth.logout")}
-            >
-              <LogOut className="h-5 w-5" />
-            </Button>
-          )}
         </div>
       </div>
     </header>
