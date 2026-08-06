@@ -2,7 +2,7 @@ import React from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
-  Calendar,
+  Home,
   Briefcase,
   Clock,
   MessageSquare,
@@ -22,8 +22,8 @@ interface NavItem {
 const providerNavItems: NavItem[] = [
   {
     path: "/provider",
-    labelKey: "nav.requests",
-    icon: <Calendar className="h-5 w-5" />,
+    labelKey: "nav.home",
+    icon: <Home className="h-5 w-5" />,
     guestAllowed: true,
   },
   {

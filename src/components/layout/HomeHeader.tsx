@@ -1,7 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeftRight, MessageCircle } from "lucide-react";
+import { ArrowLeftRight, MessageCircle, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -43,18 +43,18 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({ roleLabel }) => {
     <header className="sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur-md">
       <div className="container flex items-center justify-between gap-2 py-3">
         {/* User identity */}
-        <div className="flex items-center gap-3">
-          <Avatar className="h-11 w-11">
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar className="h-11 w-11 shrink-0">
             <AvatarImage src={user?.photoURL} alt={user?.name} />
             <AvatarFallback className="font-semibold text-primary">
               {(user?.name || "?").charAt(0)}
             </AvatarFallback>
           </Avatar>
-          <div>
-            <h1 className="font-semibold leading-tight text-foreground">
+          <div className="min-w-0">
+            <h1 className="truncate font-semibold leading-tight text-foreground">
               {user?.name || t("profile.guest")}
             </h1>
-            <p className="text-xs text-muted-foreground">
+            <p className="truncate text-xs text-muted-foreground">
               {t(`roles.${roleLabel}`)}
             </p>
           </div>
@@ -65,14 +65,15 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({ roleLabel }) => {
           <button
             type="button"
             onClick={handleSwitchRole}
-            className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/15"
           >
-            <ArrowLeftRight className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">
+            <ArrowLeftRight className="h-3.5 w-3.5 shrink-0" />
+            <span className="whitespace-nowrap">
               {activeRole === "CLIENT"
                 ? t("home.switchToProvider")
                 : t("home.switchToClient")}
             </span>
+            <User className="h-3.5 w-3.5 shrink-0" />
           </button>
         )}
 
