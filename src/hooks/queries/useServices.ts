@@ -37,12 +37,21 @@ export const useServices = (filters?: {
   });
 };
 
-// Fetch services by provider (includes inactive for provider's own management)
-export const useProviderServices = (providerId: string) => {
+// Fetch services by provider. By default includes inactive services (for
+// the provider's own management page). Pass isActiveOnly for client-facing
+// views (e.g. a provider's public profile) so services hidden by an
+// expired/locked subscription don't leak through a direct profile link.
+export const useProviderServices = (
+  providerId: string,
+  isActiveOnly?: boolean,
+) => {
   return useQuery<Service[], Error>({
-    queryKey: serviceKeys.byProvider(providerId),
+    queryKey: [...serviceKeys.byProvider(providerId), { isActiveOnly }],
     queryFn: async () => {
-      const services = await getServices({ providerId });
+      const services = await getServices({
+        providerId,
+        ...(isActiveOnly ? { isActive: true } : {}),
+      });
       // If no services found and it's a mock provider, return mock services
       if (services.length === 0 && providerId.startsWith("provider-")) {
         return DEFAULT_SERVICES.filter((s) => s.providerId === providerId);

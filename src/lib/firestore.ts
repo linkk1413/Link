@@ -43,7 +43,6 @@ import {
   ReportTargetType,
   ReportInternalNote,
   ReportActivityEntry,
-  BookingTimelineEntry,
   BlockedUser,
   Favorite,
   AppNotification,
@@ -903,29 +902,45 @@ export const getVerifiedProviders = async (
 ): Promise<ProviderProfile[]> => {
   try {
     const providersRef = collection(db, COLLECTIONS.PROVIDERS);
+    // Fetch extra and filter out expired/cancelled subscriptions client-side
+    // (avoids needing a composite index for accountStatus + orderBy + a
+    // second subscriptionStatus filter — same "sort/filter client-side"
+    // pattern used elsewhere in this file).
+    const fetchLimit = limitCount * 2;
 
     // First try with accountStatus filter
     let q = query(
       providersRef,
       where("accountStatus", "==", "ACTIVE"),
       orderBy("ratingAvg", "desc"),
-      limit(limitCount),
+      limit(fetchLimit),
     );
     let snapshot = await getDocs(q);
 
     // If no results, try without the accountStatus filter (for backwards compatibility)
     if (snapshot.empty) {
-      q = query(providersRef, orderBy("ratingAvg", "desc"), limit(limitCount));
+      q = query(providersRef, orderBy("ratingAvg", "desc"), limit(fetchLimit));
       snapshot = await getDocs(q);
     }
 
-    return snapshot.docs.map((doc) => {
+    const providers = snapshot.docs.map((doc) => {
       const data = doc.data() as FirestoreProviderProfile;
       return {
         ...data,
         updatedAt: timestampToDate(data.updatedAt),
       };
     });
+
+    // A locked/expired provider shouldn't be surfaced as "featured" even if
+    // accountStatus itself is still ACTIVE (subscription and account lock
+    // are independent fields).
+    return providers
+      .filter(
+        (p) =>
+          p.subscriptionStatus !== "EXPIRED" &&
+          p.subscriptionStatus !== "CANCELLED",
+      )
+      .slice(0, limitCount);
   } catch (error) {
     console.warn("Error fetching providers:", error);
     return [];

@@ -1276,68 +1276,185 @@ exports.paypalVoidAuthorization = onRequest(
 // Admin account deletion
 // =====================
 
-// Permanently deletes a user: their Firebase Auth account plus their
-// users/{uid} and providers/{uid} Firestore docs. Only an ADMIN may call
-// this — Firestore rules can't do this themselves since deleting an Auth
-// account requires the Admin SDK. Irreversible.
-exports.adminDeleteUser = onCall(async (request) => {
-  const callerUid = request.auth?.uid;
-  if (!callerUid) {
-    throw new HttpsError("unauthenticated", "Sign in required.");
-  }
+// Firestore batched writes cap at 500 ops — chunk defensively below that.
+const CASCADE_DELETE_CHUNK_SIZE = 450;
 
-  const callerSnap = await db.collection("users").doc(callerUid).get();
-  const callerRole = callerSnap.exists
-    ? callerSnap.data().activeRole || callerSnap.data().role
-    : null;
-  if (callerRole !== "ADMIN") {
-    throw new HttpsError("permission-denied", "Admin only.");
+// Deletes every doc matched by a query, in safely-sized batches. Use for
+// collections with no subcollections of their own.
+async function deleteDocsForQuery(query) {
+  const snap = await query.get();
+  for (let i = 0; i < snap.docs.length; i += CASCADE_DELETE_CHUNK_SIZE) {
+    const batch = db.batch();
+    snap.docs
+      .slice(i, i + CASCADE_DELETE_CHUNK_SIZE)
+      .forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
   }
+  return snap.docs.length;
+}
 
-  const targetUid = request.data?.uid;
-  if (!targetUid || typeof targetUid !== "string") {
-    throw new HttpsError("invalid-argument", "Missing uid.");
+// Deletes every doc matched by a query plus all of its subcollections
+// (chats -> messages, bookings -> timeline, reports -> internalNotes/activity).
+async function recursiveDeleteDocsForQuery(query) {
+  const snap = await query.get();
+  for (const doc of snap.docs) {
+    await db.recursiveDelete(doc.ref);
   }
-  if (targetUid === callerUid) {
-    throw new HttpsError(
-      "failed-precondition",
-      "Admins cannot delete their own account this way.",
-    );
-  }
+  return snap.docs.length;
+}
 
-  const targetSnap = await db.collection("users").doc(targetUid).get();
-  const targetData = targetSnap.exists ? targetSnap.data() : null;
-
+async function deleteStoragePrefix(prefix) {
   try {
-    await admin.auth().deleteUser(targetUid);
+    await admin.storage().bucket().deleteFiles({ prefix });
   } catch (error) {
-    // Auth user may already be gone (e.g. retried call) — proceed to clean
-    // up Firestore either way.
-    if (error.code !== "auth/user-not-found") {
-      console.error(`Failed to delete auth user ${targetUid}:`, error);
-      throw new HttpsError("internal", "Failed to delete authentication account.");
+    // Best-effort — a missing folder (never uploaded) is not an error.
+    console.warn(`Failed to delete storage prefix ${prefix}:`, error);
+  }
+}
+
+// Permanently deletes a user: their Firebase Auth account, users/{uid} and
+// providers/{uid} (which holds their subscription — there's no separate
+// subscriptions collection to go out of sync), and every other Firestore
+// doc/subcollection or Storage file that references them as either a client
+// or a provider. Only an ADMIN may call this — deleting the Auth account
+// requires the Admin SDK, and a real cascade needs it too for reliability
+// on large fan-outs. Irreversible.
+exports.adminDeleteUser = onCall(
+  { timeoutSeconds: 300 },
+  async (request) => {
+    const callerUid = request.auth?.uid;
+    if (!callerUid) {
+      throw new HttpsError("unauthenticated", "Sign in required.");
     }
-  }
 
-  const batch = db.batch();
-  batch.delete(db.collection("users").doc(targetUid));
-  batch.delete(db.collection("providers").doc(targetUid));
-  await batch.commit();
+    const callerSnap = await db.collection("users").doc(callerUid).get();
+    const callerRole = callerSnap.exists
+      ? callerSnap.data().activeRole || callerSnap.data().role
+      : null;
+    if (callerRole !== "ADMIN") {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
 
-  try {
-    await db.collection("auditLogs").add({
-      actorId: callerUid,
-      actorName: callerSnap.data()?.name || callerSnap.data()?.email || null,
-      action: "USER_DELETED",
-      targetType: "USER",
-      targetId: targetUid,
-      targetLabel: targetData?.name || targetData?.email || null,
-      details: null,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  } catch (error) {
-    console.error("Failed to write audit log for adminDeleteUser:", error);
-  }
+    const targetUid = request.data?.uid;
+    if (!targetUid || typeof targetUid !== "string") {
+      throw new HttpsError("invalid-argument", "Missing uid.");
+    }
+    if (targetUid === callerUid) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Admins cannot delete their own account this way.",
+      );
+    }
 
-  return { success: true };
-});
+    const targetSnap = await db.collection("users").doc(targetUid).get();
+    const targetData = targetSnap.exists ? targetSnap.data() : null;
+
+    try {
+      await admin.auth().deleteUser(targetUid);
+    } catch (error) {
+      // Auth user may already be gone (e.g. retried call) — proceed to clean
+      // up Firestore either way.
+      if (error.code !== "auth/user-not-found") {
+        console.error(`Failed to delete auth user ${targetUid}:`, error);
+        throw new HttpsError("internal", "Failed to delete authentication account.");
+      }
+    }
+
+    // Services/ads — hidden (not deleted) on subscription expiry elsewhere;
+    // a hard account delete removes them for real.
+    await deleteDocsForQuery(
+      db.collection("services").where("providerId", "==", targetUid),
+    );
+
+    // Bookings (as client or provider) — recursive for the timeline subcollection.
+    await recursiveDeleteDocsForQuery(
+      db.collection("bookings").where("clientId", "==", targetUid),
+    );
+    await recursiveDeleteDocsForQuery(
+      db.collection("bookings").where("providerId", "==", targetUid),
+    );
+
+    await deleteDocsForQuery(
+      db.collection("payments").where("clientId", "==", targetUid),
+    );
+    await deleteDocsForQuery(
+      db.collection("payments").where("providerId", "==", targetUid),
+    );
+
+    await deleteDocsForQuery(
+      db.collection("reviews").where("clientId", "==", targetUid),
+    );
+    await deleteDocsForQuery(
+      db.collection("reviews").where("providerId", "==", targetUid),
+    );
+
+    // Chats (as client or provider) — recursive for the messages subcollection.
+    await recursiveDeleteDocsForQuery(
+      db.collection("chats").where("clientId", "==", targetUid),
+    );
+    await recursiveDeleteDocsForQuery(
+      db.collection("chats").where("providerId", "==", targetUid),
+    );
+
+    // Reports — both filed by this account and filed against it. Recursive
+    // for internalNotes/activity subcollections. auditLogs is intentionally
+    // left alone: firestore.rules makes it undeletable even by an admin, and
+    // an audit trail line referencing a since-deleted account is fine.
+    await recursiveDeleteDocsForQuery(
+      db.collection("reports").where("reporterId", "==", targetUid),
+    );
+    await recursiveDeleteDocsForQuery(
+      db.collection("reports").where("targetOwnerId", "==", targetUid),
+    );
+
+    await deleteDocsForQuery(
+      db.collection("payouts").where("providerId", "==", targetUid),
+    );
+    await deleteDocsForQuery(
+      db.collection("favorites").where("clientId", "==", targetUid),
+    );
+    await deleteDocsForQuery(
+      db.collection("blockedUsers").where("blockerId", "==", targetUid),
+    );
+    await deleteDocsForQuery(
+      db.collection("blockedUsers").where("blockedUserId", "==", targetUid),
+    );
+    await deleteDocsForQuery(
+      db.collection("notifications").where("userId", "==", targetUid),
+    );
+    await deleteDocsForQuery(
+      db.collection("verifications").where("providerId", "==", targetUid),
+    );
+
+    // Server-only doc, one per user — Admin SDK bypasses the "always false"
+    // client rule on this collection.
+    await db.collection("otpCodes").doc(targetUid).delete();
+
+    await deleteStoragePrefix(`avatars/${targetUid}/`);
+    await deleteStoragePrefix(`providers/${targetUid}/`);
+    await deleteStoragePrefix(`services/${targetUid}/`);
+    await deleteStoragePrefix(`verifications/${targetUid}/`);
+
+    const batch = db.batch();
+    batch.delete(db.collection("users").doc(targetUid));
+    batch.delete(db.collection("providers").doc(targetUid));
+    await batch.commit();
+
+    try {
+      await db.collection("auditLogs").add({
+        actorId: callerUid,
+        actorName: callerSnap.data()?.name || callerSnap.data()?.email || null,
+        action: "USER_DELETED",
+        targetType: "USER",
+        targetId: targetUid,
+        targetLabel: targetData?.name || targetData?.email || null,
+        details: null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Failed to write audit log for adminDeleteUser:", error);
+    }
+
+    return { success: true };
+  },
+);

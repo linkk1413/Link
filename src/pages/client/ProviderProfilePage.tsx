@@ -89,7 +89,7 @@ const ProviderProfilePage: React.FC = () => {
     id || "",
   );
   const { data: services = [], isLoading: loadingServices } =
-    useProviderServices(id || "");
+    useProviderServices(id || "", true);
   const { data: reviews = [], isLoading: loadingReviews } = useReviews({
     providerId: id,
   });

@@ -11,6 +11,8 @@ import {
   Briefcase,
   XCircle,
   TrendingUp,
+  AlertTriangle,
+  Clock,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -55,6 +57,8 @@ const AdminDashboardPage: React.FC = () => {
     data: subscriptionStats = {
       active: 0,
       expired: 0,
+      expiringSoon: 0,
+      pendingActivation: 0,
       mrr: 0,
       yourProfit: 0,
       payoutsOwed: 0,
@@ -71,6 +75,8 @@ const AdminDashboardPage: React.FC = () => {
 
       let activeCount = 0;
       let expiredCount = 0;
+      let expiringSoonCount = 0;
+      let pendingActivationCount = 0;
       let totalMRR = 0;
       let yourProfit = 0;
       let payoutsOwed = 0;
@@ -92,6 +98,18 @@ const AdminDashboardPage: React.FC = () => {
         if (profile.subscriptionStatus === "EXPIRED") {
           expiredCount++;
         }
+        if (profile.subscriptionEndDate) {
+          const daysLeft = Math.ceil(
+            (new Date(profile.subscriptionEndDate).getTime() - Date.now()) /
+              (1000 * 60 * 60 * 24),
+          );
+          if (daysLeft > 0 && daysLeft <= 7) {
+            expiringSoonCount++;
+          }
+        }
+        if (profile.paymentVerificationStatus === "PENDING") {
+          pendingActivationCount++;
+        }
       }
 
       // Payouts owed = MRR - Already received
@@ -100,6 +118,8 @@ const AdminDashboardPage: React.FC = () => {
       return {
         active: activeCount,
         expired: expiredCount,
+        expiringSoon: expiringSoonCount,
+        pendingActivation: pendingActivationCount,
         mrr: totalMRR,
         yourProfit,
         payoutsOwed,
@@ -501,6 +521,24 @@ const AdminDashboardPage: React.FC = () => {
       label: t("admin.activeSubscriptions"),
       value: subscriptionStats.active.toString(),
       color: "bg-purple-500",
+    },
+    {
+      icon: <XCircle className="h-6 w-6" />,
+      label: t("admin.expiredSubscriptions"),
+      value: subscriptionStats.expired.toString(),
+      color: "bg-red-600",
+    },
+    {
+      icon: <Clock className="h-6 w-6" />,
+      label: t("admin.expiringSoon"),
+      value: subscriptionStats.expiringSoon.toString(),
+      color: "bg-amber-600",
+    },
+    {
+      icon: <AlertTriangle className="h-6 w-6" />,
+      label: t("admin.pendingActivation"),
+      value: subscriptionStats.pendingActivation.toString(),
+      color: "bg-orange-500",
     },
     {
       icon: <CreditCard className="h-6 w-6" />,

@@ -87,6 +87,7 @@ import {
 } from "@/lib/saudiLocations";
 import { logAdminAction } from "@/lib/firestore";
 import { useAuth } from "@/contexts/AuthContext";
+import { SubscriptionActions } from "@/components/admin/SubscriptionActions";
 
 const AdminUserDetailPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -489,6 +490,14 @@ const AdminUserDetailPage: React.FC = () => {
       minute: "2-digit",
     });
 
+  const daysUntilExpiry = (endDate: Date | undefined) => {
+    if (!endDate) return null;
+    const diff = Math.ceil(
+      (new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+    );
+    return diff;
+  };
+
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
 
   if (loadingUser) {
@@ -572,10 +581,78 @@ const AdminUserDetailPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Status card — everything needed to know this account's state at
+            a glance, without digging through tabs. */}
+        {isProviderDetails && providerProfile && (
+          <div className="mb-6 grid grid-cols-2 gap-3 rounded-xl bg-card p-4 sm:grid-cols-4">
+            <div>
+              <p className="text-xs text-muted-foreground">{t("admin.accountStatusLabel")}</p>
+              <p className="mt-1">{getStatusBadge(detailsUser.status)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">{t("admin.subscriptionStatusLabel")}</p>
+              <p className="mt-1">
+                <Badge
+                  variant={
+                    providerProfile.subscriptionStatus === "ACTIVE"
+                      ? "default"
+                      : providerProfile.subscriptionStatus === "TRIAL"
+                        ? "secondary"
+                        : "destructive"
+                  }
+                >
+                  {providerProfile.subscriptionStatus || t("admin.statusExpired")}
+                </Badge>
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">{t("admin.subscriptionStartDate")}</p>
+              <p className="mt-1 text-sm font-medium">
+                {formatDate(providerProfile.subscriptionStartDate)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">{t("admin.subscriptionEndDate")}</p>
+              <p className="mt-1 text-sm font-medium">
+                {formatDate(providerProfile.subscriptionEndDate)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">{t("admin.daysRemaining")}</p>
+              <p className="mt-1 text-sm font-medium">
+                {(() => {
+                  const days = daysUntilExpiry(providerProfile.subscriptionEndDate);
+                  if (days === null) return t("admin.notProvided");
+                  return days > 0 ? days : 0;
+                })()}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">{t("admin.lastPaymentDate")}</p>
+              <p className="mt-1 text-sm font-medium">
+                {formatDate(providerProfile.lastSubscriptionPaymentDate)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">{t("admin.lastPaymentAmount")}</p>
+              <p className="mt-1 text-sm font-medium">
+                {providerProfile.lastSubscriptionPaymentAmount
+                  ? `${providerProfile.lastSubscriptionPaymentAmount} ${t("common.currency")}`
+                  : t("admin.notProvided")}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Tabs */}
         <Tabs defaultValue="overview">
           <TabsList>
             <TabsTrigger value="overview">{t("admin.tabOverview")}</TabsTrigger>
+            {isProviderDetails && (
+              <TabsTrigger value="subscription">
+                {t("admin.tabSubscription")}
+              </TabsTrigger>
+            )}
             <TabsTrigger value="reviews">
               {t("admin.tabReviews")} ({reviews.length})
             </TabsTrigger>
@@ -842,6 +919,15 @@ const AdminUserDetailPage: React.FC = () => {
               </div>
             )}
           </TabsContent>
+
+          {/* ===== Subscription ===== */}
+          {isProviderDetails && providerProfile && (
+            <TabsContent value="subscription" className="mt-4">
+              <div className="rounded-lg border border-border p-4">
+                <SubscriptionActions provider={providerProfile} />
+              </div>
+            </TabsContent>
+          )}
 
           {/* ===== Reviews ===== */}
           <TabsContent value="reviews" className="mt-4 space-y-3">
