@@ -7,6 +7,7 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  reorderCategories,
 } from "@/lib/firestore";
 import { Category } from "@/types";
 
@@ -69,6 +70,19 @@ export const useUpdateCategory = () => {
       id: string;
       updates: Partial<Omit<Category, "id">>;
     }) => updateCategory(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: categoryKeys.all });
+      queryClient.invalidateQueries({ queryKey: categoryKeys.allAdmin });
+    },
+  });
+};
+
+// Persist a new drag-and-drop order for the admin categories list
+export const useReorderCategories = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (orderedIds: string[]) => reorderCategories(orderedIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: categoryKeys.all });
       queryClient.invalidateQueries({ queryKey: categoryKeys.allAdmin });

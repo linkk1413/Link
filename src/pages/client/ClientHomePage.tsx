@@ -120,7 +120,13 @@ const ClientHomePage: React.FC = () => {
       });
     });
 
-    return Array.from(map.values());
+    // Respect the admin-configured category order rather than first-seen
+    // order from the services list.
+    return Array.from(map.values()).sort((a, b) => {
+      const orderA = categories.find((c) => c.id === a.id)?.sortOrder ?? 0;
+      const orderB = categories.find((c) => c.id === b.id)?.sortOrder ?? 0;
+      return orderA - orderB;
+    });
   }, [services, categories, isArabic]);
 
   // Get popular services (top 4 by provider rating)

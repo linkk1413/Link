@@ -190,6 +190,7 @@ export interface Category {
   isActive: boolean;
   icon?: string;
   imageUrl?: string;
+  sortOrder?: number;
 }
 
 // Service

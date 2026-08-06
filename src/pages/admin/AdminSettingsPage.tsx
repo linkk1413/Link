@@ -1,6 +1,21 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   ImageIcon,
   Plus,
@@ -17,6 +32,7 @@ import {
   ArrowUp,
   ArrowDown,
   Link as LinkIcon,
+  GripVertical,
 } from "lucide-react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
@@ -50,6 +66,7 @@ import {
   useCreateCategory,
   useUpdateCategory,
   useDeleteCategory,
+  useReorderCategories,
 } from "@/hooks/queries/useCategories";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { forceReseedCategories, logAdminAction } from "@/lib/firestore";
@@ -62,12 +79,115 @@ import {
   Category,
 } from "@/types";
 
+interface SortableCategoryRowProps {
+  category: Category;
+  language: string;
+  onEdit: () => void;
+  onDelete: () => void;
+  activeLabel: string;
+  inactiveLabel: string;
+}
+
+const SortableCategoryRow: React.FC<SortableCategoryRowProps> = ({
+  category,
+  language,
+  onEdit,
+  onDelete,
+  activeLabel,
+  inactiveLabel,
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: category.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center justify-between rounded-lg border bg-card p-3 hover:bg-accent/50"
+    >
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="touch-none cursor-grab text-muted-foreground active:cursor-grabbing"
+        >
+          <GripVertical className="h-5 w-5" />
+        </button>
+        {category.imageUrl ? (
+          <img
+            src={category.imageUrl}
+            alt={category.nameEn}
+            className="h-10 w-10 rounded-lg object-cover"
+          />
+        ) : (
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+            <CategoryIcon
+              icon={category.icon}
+              size={20}
+              className="text-primary"
+            />
+          </div>
+        )}
+        <div>
+          <p className="font-medium">
+            {language === "ar" ? category.nameAr : category.nameEn}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {language === "ar" ? category.nameEn : category.nameAr}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Badge variant={category.isActive ? "default" : "secondary"}>
+          {category.isActive ? activeLabel : inactiveLabel}
+        </Badge>
+        <Button variant="ghost" size="icon" onClick={onEdit}>
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={onDelete}>
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 const AdminSettingsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
 
   const { data: categories = [], isLoading: loadingCategories } =
     useAllCategories();
+  const reorderCategoriesMutation = useReorderCategories();
+  const [orderedCategories, setOrderedCategories] = useState<Category[]>([]);
+  const dragSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  useEffect(() => {
+    setOrderedCategories(categories);
+  }, [categories]);
+
+  const handleCategoryDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    setOrderedCategories((prev) => {
+      const oldIndex = prev.findIndex((c) => c.id === active.id);
+      const newIndex = prev.findIndex((c) => c.id === over.id);
+      const reordered = arrayMove(prev, oldIndex, newIndex);
+      reorderCategoriesMutation.mutate(reordered.map((c) => c.id));
+      return reordered;
+    });
+  };
+
   const { data: banner } = useBanner();
   const updateBanner = useUpdateBanner();
   const { data: providerBanner } = useProviderBanner();
@@ -474,62 +594,33 @@ const AdminSettingsPage: React.FC = () => {
             </p>
           ) : (
             <ScrollArea className="h-[300px]">
-              <div className="space-y-2">
-                {categories.map((category) => (
-                  <div
-                    key={category.id}
-                    className="flex items-center justify-between rounded-lg border p-3 hover:bg-accent/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      {category.imageUrl ? (
-                        <img
-                          src={category.imageUrl}
-                          alt={category.nameEn}
-                          className="h-10 w-10 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                          <CategoryIcon
-                            icon={category.icon}
-                            size={20}
-                            className="text-primary"
-                          />
-                        </div>
-                      )}
-                      <div>
-                        <p className="font-medium">
-                          {i18n.language === "ar" ? category.nameAr : category.nameEn}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {i18n.language === "ar" ? category.nameEn : category.nameAr}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={category.isActive ? "default" : "secondary"}>
-                        {category.isActive ? t("admin.active") : t("admin.inactive")}
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditCategory(category)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
+              <DndContext
+                sensors={dragSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleCategoryDragEnd}
+              >
+                <SortableContext
+                  items={orderedCategories.map((c) => c.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {orderedCategories.map((category) => (
+                      <SortableCategoryRow
+                        key={category.id}
+                        category={category}
+                        language={i18n.language}
+                        onEdit={() => openEditCategory(category)}
+                        onDelete={() => {
                           setCategoryToDelete(category);
                           setDeleteCategoryDialog(true);
                         }}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
+                        activeLabel={t("admin.active")}
+                        inactiveLabel={t("admin.inactive")}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
             </ScrollArea>
           )}
         </CardContent>

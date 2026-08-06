@@ -604,6 +604,11 @@ export const forceReseedCategories = async (): Promise<void> => {
   await batch.commit();
 };
 
+// Sorted client-side (not via orderBy) so this never depends on a
+// composite index — categories are few enough that this is free.
+const sortByOrder = (categories: Category[]): Category[] =>
+  [...categories].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
 export const getCategories = async (): Promise<Category[]> => {
   try {
     const categoriesRef = collection(db, COLLECTIONS.CATEGORIES);
@@ -615,10 +620,12 @@ export const getCategories = async (): Promise<Category[]> => {
       return DEFAULT_CATEGORIES;
     }
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Category[];
+    return sortByOrder(
+      snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Category[],
+    );
   } catch (error) {
     console.warn("Error fetching categories from Firestore:", error);
     return DEFAULT_CATEGORIES;
@@ -643,10 +650,12 @@ export const getAllCategories = async (): Promise<Category[]> => {
       return DEFAULT_CATEGORIES;
     }
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Category[];
+    return sortByOrder(
+      snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Category[],
+    );
   } catch (error) {
     console.warn("Error fetching all categories:", error);
     return DEFAULT_CATEGORIES;
@@ -672,6 +681,19 @@ export const updateCategory = async (
 export const deleteCategory = async (id: string): Promise<void> => {
   const categoryRef = doc(db, COLLECTIONS.CATEGORIES, id);
   await deleteDoc(categoryRef);
+};
+
+// Persist a new drag-and-drop order for the admin categories list — writes
+// sortOrder for every category in one batch, by position in orderedIds.
+export const reorderCategories = async (
+  orderedIds: string[],
+): Promise<void> => {
+  const batch = writeBatch(db);
+  orderedIds.forEach((id, index) => {
+    const categoryRef = doc(db, COLLECTIONS.CATEGORIES, id);
+    batch.update(categoryRef, { sortOrder: index });
+  });
+  await batch.commit();
 };
 
 // ============================================
