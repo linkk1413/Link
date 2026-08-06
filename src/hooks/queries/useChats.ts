@@ -87,6 +87,12 @@ export const useClientChats = (clientId: string) => {
             lastMessageAt: data.lastMessageAt
               ? convertTimestamp(data.lastMessageAt)
               : undefined,
+            clientLastReadAt: data.clientLastReadAt
+              ? convertTimestamp(data.clientLastReadAt)
+              : undefined,
+            providerLastReadAt: data.providerLastReadAt
+              ? convertTimestamp(data.providerLastReadAt)
+              : undefined,
           } as Chat;
         }),
       );
@@ -121,6 +127,12 @@ export const useProviderChats = (providerId: string) => {
           createdAt: convertTimestamp(data.createdAt),
           lastMessageAt: data.lastMessageAt
             ? convertTimestamp(data.lastMessageAt)
+            : undefined,
+          clientLastReadAt: data.clientLastReadAt
+            ? convertTimestamp(data.clientLastReadAt)
+            : undefined,
+          providerLastReadAt: data.providerLastReadAt
+            ? convertTimestamp(data.providerLastReadAt)
             : undefined,
         } as Chat;
       });
@@ -239,6 +251,7 @@ export const useSendMessage = () => {
       await updateDoc(chatRef, {
         lastMessage: text || "📷 Image",
         lastMessageAt: serverTimestamp(),
+        lastMessageSenderId: senderId,
       });
 
       return docRef.id;
@@ -249,6 +262,58 @@ export const useSendMessage = () => {
       queryClient.invalidateQueries({ queryKey: chatKeys.all });
     },
   });
+};
+
+// Mark a chat as read up to now for the given side (client or provider).
+// Powers the unread-messages badge — the chat doc already allows either
+// participant to update their own chat (see firestore.rules), no rules
+// change needed.
+export const useMarkChatRead = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      chatId,
+      role,
+    }: {
+      chatId: string;
+      role: "CLIENT" | "PROVIDER";
+    }) => {
+      const field = role === "CLIENT" ? "clientLastReadAt" : "providerLastReadAt";
+      await updateDoc(doc(db, "chats", chatId), {
+        [field]: serverTimestamp(),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: chatKeys.all });
+    },
+  });
+};
+
+// Aggregate unread-chat count for the header badge — derived client-side
+// from the chat list already fetched by useClientChats/useProviderChats,
+// no extra query. A chat counts as unread when the other side sent the
+// last message and it's newer than my last-read marker.
+export const useUnreadChatsCount = (
+  role: "CLIENT" | "PROVIDER",
+  userId: string,
+): number => {
+  const { data: clientChats = [] } = useClientChats(
+    role === "CLIENT" ? userId : "",
+  );
+  const { data: providerChats = [] } = useProviderChats(
+    role === "PROVIDER" ? userId : "",
+  );
+  const chats = role === "CLIENT" ? clientChats : providerChats;
+
+  return chats.filter((chat) => {
+    if (!chat.lastMessageAt || !chat.lastMessageSenderId) return false;
+    if (chat.lastMessageSenderId === userId) return false;
+    const lastReadAt =
+      role === "CLIENT" ? chat.clientLastReadAt : chat.providerLastReadAt;
+    if (!lastReadAt) return true;
+    return chat.lastMessageAt.getTime() > lastReadAt.getTime();
+  }).length;
 };
 
 // Create a new chat (or get existing one)

@@ -14,6 +14,9 @@ import {
   Mail,
   AlertTriangle,
   CreditCard,
+  ArrowUp,
+  ArrowDown,
+  Link as LinkIcon,
 } from "lucide-react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
@@ -52,7 +55,12 @@ import { CategoryIcon } from "@/components/CategoryIcon";
 import { forceReseedCategories, logAdminAction } from "@/lib/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/sonner";
-import { BannerSettings, ProviderBannerSettings, Category } from "@/types";
+import {
+  BannerSettings,
+  ProviderBannerSettings,
+  BannerSlide,
+  Category,
+} from "@/types";
 
 const AdminSettingsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -121,6 +129,13 @@ const AdminSettingsPage: React.FC = () => {
   });
   const [reseedConfirmOpen, setReseedConfirmOpen] = useState(false);
 
+  // Banner slide upload state
+  const [uploadingSlideFor, setUploadingSlideFor] = useState<
+    "client" | "provider" | null
+  >(null);
+  const clientSlideInputRef = useRef<HTMLInputElement>(null);
+  const providerSlideInputRef = useRef<HTMLInputElement>(null);
+
   // Initialize banner form when data loads
   React.useEffect(() => {
     if (banner && Object.keys(bannerForm).length === 0) {
@@ -174,6 +189,82 @@ const AdminSettingsPage: React.FC = () => {
       console.error("Failed to update provider banner:", error);
       toast.error(t("common.error"));
     }
+  };
+
+  const handleAddBannerSlide = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    target: "client" | "provider",
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error(t("admin.invalidImageType"));
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error(t("admin.imageTooLarge"));
+      return;
+    }
+
+    setUploadingSlideFor(target);
+    try {
+      const timestamp = Date.now();
+      const storageRef = ref(storage, `banners/${timestamp}-${file.name}`);
+      await uploadBytes(storageRef, file);
+      const imageUrl = await getDownloadURL(storageRef);
+      const newSlide: BannerSlide = { id: `${timestamp}`, imageUrl };
+      const setForm = target === "client" ? setBannerForm : setProviderBannerForm;
+      setForm((prev) => ({ ...prev, slides: [...(prev.slides || []), newSlide] }));
+      toast.success(t("admin.imageUploaded"));
+    } catch (error) {
+      console.error("Slide upload failed:", error);
+      toast.error(t("admin.uploadFailed"));
+    } finally {
+      setUploadingSlideFor(null);
+      const inputRef = target === "client" ? clientSlideInputRef : providerSlideInputRef;
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveBannerSlide = (
+    target: "client" | "provider",
+    slideId: string,
+  ) => {
+    const setForm = target === "client" ? setBannerForm : setProviderBannerForm;
+    setForm((prev) => ({
+      ...prev,
+      slides: (prev.slides || []).filter((s) => s.id !== slideId),
+    }));
+  };
+
+  const handleReorderBannerSlide = (
+    target: "client" | "provider",
+    index: number,
+    direction: -1 | 1,
+  ) => {
+    const setForm = target === "client" ? setBannerForm : setProviderBannerForm;
+    setForm((prev) => {
+      const slides = [...(prev.slides || [])];
+      const newIndex = index + direction;
+      if (newIndex < 0 || newIndex >= slides.length) return prev;
+      [slides[index], slides[newIndex]] = [slides[newIndex], slides[index]];
+      return { ...prev, slides };
+    });
+  };
+
+  const handleBannerSlideLinkChange = (
+    target: "client" | "provider",
+    slideId: string,
+    linkUrl: string,
+  ) => {
+    const setForm = target === "client" ? setBannerForm : setProviderBannerForm;
+    setForm((prev) => ({
+      ...prev,
+      slides: (prev.slides || []).map((s) =>
+        s.id === slideId ? { ...s, linkUrl } : s,
+      ),
+    }));
   };
 
   const handleSubscriptionUpdate = async () => {
@@ -676,134 +767,92 @@ const AdminSettingsPage: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {bannerForm.isActive && (
-            <div
-              className="mb-4 rounded-xl p-4"
-              style={{
-                backgroundColor: bannerForm.backgroundColor || "#7c3aed",
-                color: bannerForm.textColor || "#ffffff",
-              }}
-            >
-              <p className="font-bold">
-                {i18n.language === "ar" ? bannerForm.titleAr : bannerForm.titleEn}
+          <div className="space-y-3">
+            {(bannerForm.slides || []).length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                {t("admin.noSlides")}
               </p>
-              <p className="text-sm opacity-80">
-                {i18n.language === "ar" ? bannerForm.subtitleAr : bannerForm.subtitleEn}
-              </p>
-            </div>
-          )}
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="banner-title-en">{t("admin.bannerTitleEn")}</Label>
-              <Input
-                id="banner-title-en"
-                value={bannerForm.titleEn || ""}
-                onChange={(e) =>
-                  setBannerForm((prev) => ({ ...prev, titleEn: e.target.value }))
-                }
-                placeholder="Summer Sale!"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="banner-title-ar">{t("admin.bannerTitleAr")}</Label>
-              <Input
-                id="banner-title-ar"
-                value={bannerForm.titleAr || ""}
-                onChange={(e) =>
-                  setBannerForm((prev) => ({ ...prev, titleAr: e.target.value }))
-                }
-                placeholder="تخفيضات الصيف!"
-                dir="rtl"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="banner-subtitle-en">{t("admin.bannerSubtitleEn")}</Label>
-              <Input
-                id="banner-subtitle-en"
-                value={bannerForm.subtitleEn || ""}
-                onChange={(e) =>
-                  setBannerForm((prev) => ({ ...prev, subtitleEn: e.target.value }))
-                }
-                placeholder="Get 20% off all services"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="banner-subtitle-ar">{t("admin.bannerSubtitleAr")}</Label>
-              <Input
-                id="banner-subtitle-ar"
-                value={bannerForm.subtitleAr || ""}
-                onChange={(e) =>
-                  setBannerForm((prev) => ({ ...prev, subtitleAr: e.target.value }))
-                }
-                placeholder="احصلي على خصم 20% على جميع الخدمات"
-                dir="rtl"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="banner-bg-color">{t("admin.bannerBgColor")}</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="banner-bg-color"
-                  type="color"
-                  value={bannerForm.backgroundColor || "#7c3aed"}
-                  onChange={(e) =>
-                    setBannerForm((prev) => ({
-                      ...prev,
-                      backgroundColor: e.target.value,
-                    }))
-                  }
-                  className="h-10 w-14 p-1"
+            )}
+            {(bannerForm.slides || []).map((slide, index) => (
+              <div
+                key={slide.id}
+                className="flex items-center gap-3 rounded-lg border border-border p-2"
+              >
+                <img
+                  src={slide.imageUrl}
+                  alt=""
+                  className="h-16 w-28 shrink-0 rounded-md object-cover"
                 />
-                <Input
-                  value={bannerForm.backgroundColor || "#7c3aed"}
-                  onChange={(e) =>
-                    setBannerForm((prev) => ({
-                      ...prev,
-                      backgroundColor: e.target.value,
-                    }))
-                  }
-                  className="flex-1"
-                />
+                <div className="flex-1 space-y-1">
+                  <div className="relative">
+                    <LinkIcon className="absolute start-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={slide.linkUrl || ""}
+                      onChange={(e) =>
+                        handleBannerSlideLinkChange("client", slide.id, e.target.value)
+                      }
+                      placeholder={t("admin.bannerSlideLink")}
+                      className="h-8 ps-7 text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    disabled={index === 0}
+                    onClick={() => handleReorderBannerSlide("client", index, -1)}
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    disabled={index === (bannerForm.slides?.length || 0) - 1}
+                    onClick={() => handleReorderBannerSlide("client", index, 1)}
+                  >
+                    <ArrowDown className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive"
+                    onClick={() => handleRemoveBannerSlide("client", slide.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="banner-text-color">{t("admin.bannerTextColor")}</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="banner-text-color"
-                  type="color"
-                  value={bannerForm.textColor || "#ffffff"}
-                  onChange={(e) =>
-                    setBannerForm((prev) => ({ ...prev, textColor: e.target.value }))
-                  }
-                  className="h-10 w-14 p-1"
-                />
-                <Input
-                  value={bannerForm.textColor || "#ffffff"}
-                  onChange={(e) =>
-                    setBannerForm((prev) => ({ ...prev, textColor: e.target.value }))
-                  }
-                  className="flex-1"
-                />
-              </div>
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="banner-link">{t("admin.bannerLink")}</Label>
-              <Input
-                id="banner-link"
-                value={bannerForm.linkUrl || ""}
-                onChange={(e) =>
-                  setBannerForm((prev) => ({ ...prev, linkUrl: e.target.value }))
-                }
-                placeholder="/client/search?categories=bridal"
-              />
-            </div>
+            ))}
           </div>
+
+          <input
+            ref={clientSlideInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handleAddBannerSlide(e, "client")}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => clientSlideInputRef.current?.click()}
+            disabled={uploadingSlideFor === "client"}
+          >
+            {uploadingSlideFor === "client" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+            {t("admin.addSlide")}
+          </Button>
+
           <Button
             onClick={handleBannerUpdate}
             disabled={updateBanner.isPending}
-            className="w-full sm:w-auto"
+            className="block w-full sm:w-auto"
           >
             {updateBanner.isPending ? t("common.saving") : t("admin.updateBanner")}
           </Button>
@@ -838,156 +887,94 @@ const AdminSettingsPage: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {providerBannerForm.isActive && (
-            <div
-              className="mb-4 rounded-xl p-4"
-              style={{
-                backgroundColor: providerBannerForm.backgroundColor || "#7c3aed",
-                color: providerBannerForm.textColor || "#ffffff",
-              }}
-            >
-              <p className="font-bold">
-                {i18n.language === "ar"
-                  ? providerBannerForm.titleAr
-                  : providerBannerForm.titleEn}
+          <div className="space-y-3">
+            {(providerBannerForm.slides || []).length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                {t("admin.noSlides")}
               </p>
-              <p className="text-sm opacity-80">
-                {i18n.language === "ar"
-                  ? providerBannerForm.subtitleAr
-                  : providerBannerForm.subtitleEn}
-              </p>
-            </div>
-          )}
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="provider-banner-title-en">{t("admin.bannerTitleEn")}</Label>
-              <Input
-                id="provider-banner-title-en"
-                value={providerBannerForm.titleEn || ""}
-                onChange={(e) =>
-                  setProviderBannerForm((prev) => ({ ...prev, titleEn: e.target.value }))
-                }
-                placeholder="New Feature!"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="provider-banner-title-ar">{t("admin.bannerTitleAr")}</Label>
-              <Input
-                id="provider-banner-title-ar"
-                value={providerBannerForm.titleAr || ""}
-                onChange={(e) =>
-                  setProviderBannerForm((prev) => ({ ...prev, titleAr: e.target.value }))
-                }
-                placeholder="ميزة جديدة!"
-                dir="rtl"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="provider-banner-subtitle-en">
-                {t("admin.bannerSubtitleEn")}
-              </Label>
-              <Input
-                id="provider-banner-subtitle-en"
-                value={providerBannerForm.subtitleEn || ""}
-                onChange={(e) =>
-                  setProviderBannerForm((prev) => ({
-                    ...prev,
-                    subtitleEn: e.target.value,
-                  }))
-                }
-                placeholder="Check out our latest updates"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="provider-banner-subtitle-ar">
-                {t("admin.bannerSubtitleAr")}
-              </Label>
-              <Input
-                id="provider-banner-subtitle-ar"
-                value={providerBannerForm.subtitleAr || ""}
-                onChange={(e) =>
-                  setProviderBannerForm((prev) => ({
-                    ...prev,
-                    subtitleAr: e.target.value,
-                  }))
-                }
-                placeholder="اطلعي على آخر التحديثات"
-                dir="rtl"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="provider-banner-bg-color">{t("admin.bannerBgColor")}</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="provider-banner-bg-color"
-                  type="color"
-                  value={providerBannerForm.backgroundColor || "#7c3aed"}
-                  onChange={(e) =>
-                    setProviderBannerForm((prev) => ({
-                      ...prev,
-                      backgroundColor: e.target.value,
-                    }))
-                  }
-                  className="h-10 w-14 p-1"
+            )}
+            {(providerBannerForm.slides || []).map((slide, index) => (
+              <div
+                key={slide.id}
+                className="flex items-center gap-3 rounded-lg border border-border p-2"
+              >
+                <img
+                  src={slide.imageUrl}
+                  alt=""
+                  className="h-16 w-28 shrink-0 rounded-md object-cover"
                 />
-                <Input
-                  value={providerBannerForm.backgroundColor || "#7c3aed"}
-                  onChange={(e) =>
-                    setProviderBannerForm((prev) => ({
-                      ...prev,
-                      backgroundColor: e.target.value,
-                    }))
-                  }
-                  className="flex-1"
-                />
+                <div className="flex-1 space-y-1">
+                  <div className="relative">
+                    <LinkIcon className="absolute start-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={slide.linkUrl || ""}
+                      onChange={(e) =>
+                        handleBannerSlideLinkChange("provider", slide.id, e.target.value)
+                      }
+                      placeholder={t("admin.bannerSlideLink")}
+                      className="h-8 ps-7 text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    disabled={index === 0}
+                    onClick={() => handleReorderBannerSlide("provider", index, -1)}
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    disabled={
+                      index === (providerBannerForm.slides?.length || 0) - 1
+                    }
+                    onClick={() => handleReorderBannerSlide("provider", index, 1)}
+                  >
+                    <ArrowDown className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive"
+                    onClick={() => handleRemoveBannerSlide("provider", slide.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="provider-banner-text-color">
-                {t("admin.bannerTextColor")}
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="provider-banner-text-color"
-                  type="color"
-                  value={providerBannerForm.textColor || "#ffffff"}
-                  onChange={(e) =>
-                    setProviderBannerForm((prev) => ({
-                      ...prev,
-                      textColor: e.target.value,
-                    }))
-                  }
-                  className="h-10 w-14 p-1"
-                />
-                <Input
-                  value={providerBannerForm.textColor || "#ffffff"}
-                  onChange={(e) =>
-                    setProviderBannerForm((prev) => ({
-                      ...prev,
-                      textColor: e.target.value,
-                    }))
-                  }
-                  className="flex-1"
-                />
-              </div>
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="provider-banner-link">{t("admin.bannerLink")}</Label>
-              <Input
-                id="provider-banner-link"
-                value={providerBannerForm.linkUrl || ""}
-                onChange={(e) =>
-                  setProviderBannerForm((prev) => ({ ...prev, linkUrl: e.target.value }))
-                }
-                placeholder="/provider/services"
-              />
-            </div>
+            ))}
           </div>
+
+          <input
+            ref={providerSlideInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handleAddBannerSlide(e, "provider")}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => providerSlideInputRef.current?.click()}
+            disabled={uploadingSlideFor === "provider"}
+          >
+            {uploadingSlideFor === "provider" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+            {t("admin.addSlide")}
+          </Button>
+
           <Button
             onClick={handleProviderBannerUpdate}
             disabled={updateProviderBanner.isPending}
-            className="w-full sm:w-auto"
+            className="block w-full sm:w-auto"
           >
             {updateProviderBanner.isPending
               ? t("common.saving")

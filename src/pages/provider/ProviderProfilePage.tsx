@@ -25,9 +25,11 @@ import {
   MessageCircle,
   MessageSquare,
   Phone,
+  Camera,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
@@ -123,6 +125,8 @@ const ProviderProfilePage: React.FC = () => {
   const [payoutAmount, setPayoutAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = React.useRef<HTMLInputElement>(null);
 
   const { data: providerProfile } = useProviderProfile(user?.uid || "");
 
@@ -360,6 +364,37 @@ const ProviderProfilePage: React.FC = () => {
     setIsEditing(false);
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error(t("admin.invalidImageType"));
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error(t("admin.imageTooLarge"));
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const timestamp = Date.now();
+      const fileRef = storageRef(storage, `avatars/${user.uid}/${timestamp}-${file.name}`);
+      await uploadBytes(fileRef, file);
+      const url = await getDownloadURL(fileRef);
+      await updateUserProfile(user.uid, { photoURL: url });
+      await refreshUser();
+      toast.success(t("profile.photoUpdated"));
+    } catch (error) {
+      console.error("Avatar upload failed:", error);
+      toast.error(t("admin.uploadFailed"));
+    } finally {
+      setIsUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!user) return;
     await Promise.all([
@@ -519,8 +554,29 @@ const ProviderProfilePage: React.FC = () => {
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="flex items-center gap-4">
-                  <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
-                    <User className="h-8 w-8 text-primary-foreground" />
+                  <div className="relative">
+                    <Avatar className="h-16 w-16">
+                      <AvatarImage src={user?.photoURL} alt={user?.name} />
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground">
+                        <User className="h-8 w-8" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={isUploadingAvatar}
+                      className="absolute -end-1 -bottom-1 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow"
+                      title={t("profile.changePhoto")}
+                    >
+                      <Camera className="h-3 w-3" />
+                    </button>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarUpload}
+                    />
                   </div>
                   <div className="flex-1">
                     <h2 className="text-xl font-semibold text-foreground">

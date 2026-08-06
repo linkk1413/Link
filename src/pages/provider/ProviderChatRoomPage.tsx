@@ -11,6 +11,7 @@ import {
   useChat,
   useChatMessages,
   useSendMessage,
+  useMarkChatRead,
 } from "@/hooks/queries/useChats";
 import { useClientName } from "@/hooks/queries/useUsers";
 import { Message } from "@/types";
@@ -62,6 +63,13 @@ const ProviderChatRoomPage: React.FC = () => {
     chatId || "",
   );
   const sendMessageMutation = useSendMessage();
+  const markChatRead = useMarkChatRead();
+
+  useEffect(() => {
+    if (!chatId || messages.length === 0) return;
+    markChatRead.mutate({ chatId, role: "PROVIDER" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId, messages.length]);
 
   // Block hooks
   const blockUserMutation = useBlockUser();

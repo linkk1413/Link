@@ -7,7 +7,6 @@ import {
   Clock,
   CheckCircle,
   Plus,
-  LogOut,
   X,
   Check,
   MapPin,
@@ -26,9 +25,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { RoleSwitcher } from "@/components/RoleSwitcher";
-import { NotificationBell } from "@/components/NotificationBell";
+import { HomeHeader } from "@/components/layout/HomeHeader";
+import { BannerSlider } from "@/components/BannerSlider";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 import {
@@ -39,12 +37,11 @@ import {
 import { useProviderBanner } from "@/hooks/queries/useBanner";
 import { getPaymentByBooking } from "@/lib/firestore";
 import { toast } from "@/components/ui/sonner";
-import logo from "@/assets/logo.jpeg";
 import { Booking } from "@/types";
 
 const ProviderDashboardPage: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const { user, firebaseUser, logout } = useAuth();
+  const { user, firebaseUser } = useAuth();
   const subscriptionStatus = useSubscriptionStatus();
   const { isLocked, isTrial, trialDaysRemaining, isExpired, profile } =
     subscriptionStatus;
@@ -248,10 +245,6 @@ const ProviderDashboardPage: React.FC = () => {
     });
   };
 
-  const handleLogout = async () => {
-    await logout();
-  };
-
   // Calculate stats from real data
   const todayBookings = pendingBookings.filter((b) => {
     const today = new Date();
@@ -288,70 +281,14 @@ const ProviderDashboardPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="container flex items-center justify-between py-4">
-          <div className="flex items-center gap-3">
-            <img
-              src={logo}
-              alt="Link"
-              className="h-10 w-10 rounded-lg object-cover"
-            />
-            <div>
-              <p className="text-sm text-muted-foreground">
-                {t("home.greeting")}
-              </p>
-              <h1 className="font-semibold text-foreground">
-                {user?.name || "Provider"}
-              </h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <NotificationBell />
-            <RoleSwitcher />
-            <LanguageSwitcher />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleLogout}
-              title={t("auth.logout")}
-            >
-              <LogOut className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-      </header>
+      <HomeHeader roleLabel="provider" />
 
       <main className="container py-6">
         {/* Provider Promotional Banner */}
-        {providerBanner?.isActive && (
-          <motion.section
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6"
-          >
-            <button
-              onClick={() =>
-                providerBanner.linkUrl && navigate(providerBanner.linkUrl)
-              }
-              className="w-full rounded-2xl p-6 text-start transition-all hover:opacity-90"
-              style={{
-                backgroundColor: providerBanner.backgroundColor,
-                color: providerBanner.textColor,
-              }}
-              disabled={!providerBanner.linkUrl}
-            >
-              <h2 className="text-xl font-bold">
-                {isArabic ? providerBanner.titleAr : providerBanner.titleEn}
-              </h2>
-              <p className="mt-1 opacity-80">
-                {isArabic
-                  ? providerBanner.subtitleAr
-                  : providerBanner.subtitleEn}
-              </p>
-            </button>
-          </motion.section>
-        )}
+        <BannerSlider
+          slides={providerBanner?.slides}
+          isActive={providerBanner?.isActive}
+        />
 
         {/* Trial Banner */}
         {isTrial && trialDaysRemaining > 0 && (

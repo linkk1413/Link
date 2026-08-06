@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Sparkles,
-  LogOut,
   Star,
   MapPin,
   Briefcase,
@@ -18,9 +17,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { RoleSwitcher } from "@/components/RoleSwitcher";
-import { NotificationBell } from "@/components/NotificationBell";
+import { HomeHeader } from "@/components/layout/HomeHeader";
+import { BannerSlider } from "@/components/BannerSlider";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGuest } from "@/contexts/GuestContext";
@@ -36,11 +34,10 @@ import {
   calculateDistanceKm,
   formatDistance,
 } from "@/hooks/useGeolocation";
-import logo from "@/assets/logo.jpeg";
 
 const ClientHomePage: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { isGuest } = useGuest();
   const navigate = useNavigate();
   const isArabic = i18n.language === "ar";
@@ -149,10 +146,6 @@ const ClientHomePage: React.FC = () => {
       : null;
   };
 
-  const handleLogout = async () => {
-    await logout();
-  };
-
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 },
@@ -160,41 +153,7 @@ const ClientHomePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="container flex items-center justify-between py-4">
-          <div className="flex items-center gap-3">
-            <img
-              src={logo}
-              alt="Link"
-              className="h-10 w-10 rounded-lg object-cover"
-            />
-            <div>
-              <p className="text-sm text-muted-foreground">
-                {t("home.greeting")}
-              </p>
-              <h1 className="font-semibold text-foreground">
-                {user?.name || "Guest"}
-              </h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {!isGuest && <NotificationBell />}
-            <RoleSwitcher />
-            <LanguageSwitcher />
-            {!isGuest && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleLogout}
-                title={t("auth.logout")}
-              >
-                <LogOut className="h-5 w-5" />
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
+      <HomeHeader roleLabel="client" />
 
       <main className="container py-6">
         <motion.div
@@ -233,26 +192,9 @@ const ClientHomePage: React.FC = () => {
           )}
 
           {/* Promotional Banner */}
-          {banner?.isActive && (
-            <motion.section variants={fadeInUp} className="mb-6">
-              <button
-                onClick={() => banner.linkUrl && navigate(banner.linkUrl)}
-                className="w-full rounded-2xl p-6 text-start transition-all hover:opacity-90"
-                style={{
-                  backgroundColor: banner.backgroundColor,
-                  color: banner.textColor,
-                }}
-                disabled={!banner.linkUrl}
-              >
-                <h2 className="text-xl font-bold">
-                  {isArabic ? banner.titleAr : banner.titleEn}
-                </h2>
-                <p className="mt-1 opacity-80">
-                  {isArabic ? banner.subtitleAr : banner.subtitleEn}
-                </p>
-              </button>
-            </motion.section>
-          )}
+          <motion.div variants={fadeInUp}>
+            <BannerSlider slides={banner?.slides} isActive={banner?.isActive} />
+          </motion.div>
 
           {/* Location Prompt - Show if no location set */}
           {!location && (

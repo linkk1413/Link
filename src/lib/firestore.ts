@@ -321,6 +321,7 @@ export const updateUserProfile = async (
       | "city"
       | "district"
       | "notificationsEnabled"
+      | "photoURL"
     >
   >,
 ): Promise<void> => {
@@ -2033,13 +2034,7 @@ export const replyToReview = async (
 
 const DEFAULT_BANNER: BannerSettings = {
   isActive: false,
-  titleEn: "Welcome to Link",
-  titleAr: "مرحباً بك في لينك",
-  subtitleEn: "Find the best services near you",
-  subtitleAr: "اعثري على أفضل الخدمات بالقرب منك",
-  backgroundColor: "#f8e1e7",
-  textColor: "#1a1a1a",
-  linkUrl: "",
+  slides: [],
   updatedAt: new Date(),
 };
 
@@ -2055,13 +2050,7 @@ export const getBannerSettings = async (): Promise<BannerSettings> => {
     const data = bannerSnap.data();
     return {
       isActive: data.isActive ?? false,
-      titleEn: data.titleEn ?? DEFAULT_BANNER.titleEn,
-      titleAr: data.titleAr ?? DEFAULT_BANNER.titleAr,
-      subtitleEn: data.subtitleEn ?? DEFAULT_BANNER.subtitleEn,
-      subtitleAr: data.subtitleAr ?? DEFAULT_BANNER.subtitleAr,
-      backgroundColor: data.backgroundColor ?? DEFAULT_BANNER.backgroundColor,
-      textColor: data.textColor ?? DEFAULT_BANNER.textColor,
-      linkUrl: data.linkUrl ?? "",
+      slides: data.slides ?? [],
       updatedAt: timestampToDate(data.updatedAt),
     };
   } catch (error) {
@@ -2090,13 +2079,7 @@ export const updateBannerSettings = async (
 
 const DEFAULT_PROVIDER_BANNER: ProviderBannerSettings = {
   isActive: false,
-  titleEn: "Welcome Provider!",
-  titleAr: "مرحباً بك أيتها المقدمة!",
-  subtitleEn: "Manage your services and grow your business",
-  subtitleAr: "أديري خدماتك ونمّي عملك",
-  backgroundColor: "#7c3aed",
-  textColor: "#ffffff",
-  linkUrl: "",
+  slides: [],
   updatedAt: new Date(),
 };
 
@@ -2113,14 +2096,7 @@ export const getProviderBannerSettings =
       const data = bannerSnap.data();
       return {
         isActive: data.isActive ?? false,
-        titleEn: data.titleEn ?? DEFAULT_PROVIDER_BANNER.titleEn,
-        titleAr: data.titleAr ?? DEFAULT_PROVIDER_BANNER.titleAr,
-        subtitleEn: data.subtitleEn ?? DEFAULT_PROVIDER_BANNER.subtitleEn,
-        subtitleAr: data.subtitleAr ?? DEFAULT_PROVIDER_BANNER.subtitleAr,
-        backgroundColor:
-          data.backgroundColor ?? DEFAULT_PROVIDER_BANNER.backgroundColor,
-        textColor: data.textColor ?? DEFAULT_PROVIDER_BANNER.textColor,
-        linkUrl: data.linkUrl ?? "",
+        slides: data.slides ?? [],
         updatedAt: timestampToDate(data.updatedAt),
       };
     } catch (error) {

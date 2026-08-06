@@ -104,6 +104,7 @@ export interface User {
   status: UserStatus;
   name: string;
   displayName?: string;
+  photoURL?: string;
   email: string;
   phone?: string;
   region?: string;
@@ -318,6 +319,9 @@ export interface Chat {
   bookingId?: string;
   lastMessage?: string;
   lastMessageAt?: Date;
+  lastMessageSenderId?: string;
+  clientLastReadAt?: Date;
+  providerLastReadAt?: Date;
   unreadCount: number;
   createdAt: Date;
 }
@@ -500,28 +504,23 @@ export interface TimeSlot {
   isAvailable: boolean;
 }
 
-// Homepage banner settings (for clients)
+// A single image slide within a promotional banner slider
+export interface BannerSlide {
+  id: string;
+  imageUrl: string;
+  linkUrl?: string; // optional link when the slide is tapped
+}
+
+// Homepage banner slider settings (for clients)
 export interface BannerSettings {
   isActive: boolean;
-  titleEn: string;
-  titleAr: string;
-  subtitleEn: string;
-  subtitleAr: string;
-  backgroundColor: string; // hex color
-  textColor: string; // hex color
-  linkUrl?: string; // optional link when banner is clicked
+  slides: BannerSlide[];
   updatedAt: Date;
 }
 
-// Provider banner settings (for providers dashboard)
+// Provider banner slider settings (for providers dashboard)
 export interface ProviderBannerSettings {
   isActive: boolean;
-  titleEn: string;
-  titleAr: string;
-  subtitleEn: string;
-  subtitleAr: string;
-  backgroundColor: string; // hex color
-  textColor: string; // hex color
-  linkUrl?: string; // optional link when banner is clicked
+  slides: BannerSlide[];
   updatedAt: Date;
 }

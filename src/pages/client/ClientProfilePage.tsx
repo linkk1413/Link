@@ -16,8 +16,11 @@ import {
   MapPin,
   Flag,
   Heart,
+  Camera,
 } from "lucide-react";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
@@ -44,6 +47,7 @@ import { useRequestTrackingConsent } from "@/components/TrackingConsent";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGuest } from "@/contexts/GuestContext";
 import { updateUserProfile } from "@/lib/firestore";
+import { storage } from "@/lib/firebase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/sonner";
 import { SAUDI_REGIONS } from "@/lib/saudiLocations";
@@ -65,6 +69,8 @@ const ClientProfilePage: React.FC = () => {
   const [deletePassword, setDeletePassword] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = React.useRef<HTMLInputElement>(null);
   const [formValues, setFormValues] = useState({
     name: user?.name || "",
     email: user?.email || "",
@@ -170,6 +176,37 @@ const ClientProfilePage: React.FC = () => {
     setIsEditing(false);
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error(t("admin.invalidImageType"));
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error(t("admin.imageTooLarge"));
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const timestamp = Date.now();
+      const storageRef = ref(storage, `avatars/${user.uid}/${timestamp}-${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      await updateUserProfile(user.uid, { photoURL: url });
+      await refreshUser();
+      toast.success(t("profile.photoUpdated"));
+    } catch (error) {
+      console.error("Avatar upload failed:", error);
+      toast.error(t("admin.uploadFailed"));
+    } finally {
+      setIsUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!user) return;
     setIsSaving(true);
@@ -272,8 +309,33 @@ const ClientProfilePage: React.FC = () => {
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-3xl">
-                    👩
+                  <div className="relative">
+                    <Avatar className="h-16 w-16">
+                      <AvatarImage src={user?.photoURL} alt={user?.name} />
+                      <AvatarFallback className="text-xl font-semibold text-primary">
+                        {(user?.name || "?").charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    {!isGuest && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => avatarInputRef.current?.click()}
+                          disabled={isUploadingAvatar}
+                          className="absolute -end-1 -bottom-1 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow"
+                          title={t("profile.changePhoto")}
+                        >
+                          <Camera className="h-3 w-3" />
+                        </button>
+                        <input
+                          ref={avatarInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleAvatarUpload}
+                        />
+                      </>
+                    )}
                   </div>
 
                   <div className="flex-1">

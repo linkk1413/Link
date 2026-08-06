@@ -10,11 +10,29 @@ service firebase.storage {
                    && request.resource.contentType.matches('image/.*');
     }
 
+    // Home/provider banner slides - admins manage them via the admin panel,
+    // everyone can read. Same trust level as categories/ (the real gate is
+    // firestore.rules blocking settings/* writes to non-admins).
+    match /banners/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 2 * 1024 * 1024  // Max 2MB
+                   && request.resource.contentType.matches('image/.*');
+    }
+
     // Service images - providers can upload, everyone can read
     match /services/{userId}/{allPaths=**} {
       allow read: if true;
       allow write: if request.auth != null && request.auth.uid == userId
                    && request.resource.size < 5 * 1024 * 1024  // Max 5MB
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // Account avatars (client and provider profile pictures)
+    match /avatars/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId
+                   && request.resource.size < 2 * 1024 * 1024  // Max 2MB
                    && request.resource.contentType.matches('image/.*');
     }
 
