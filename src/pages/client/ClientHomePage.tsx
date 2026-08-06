@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { HomeHeader } from "@/components/layout/HomeHeader";
 import { BannerSlider } from "@/components/BannerSlider";
+import { AnnouncementBar } from "@/components/AnnouncementBar";
 import { CategoryCard } from "@/components/CategoryCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGuest } from "@/contexts/GuestContext";
@@ -200,6 +201,11 @@ const ClientHomePage: React.FC = () => {
 
           {/* Promotional Banner */}
           <motion.div variants={fadeInUp}>
+            <AnnouncementBar
+              text={banner?.announcementText}
+              backgroundColor={banner?.announcementBgColor}
+              textColor={banner?.announcementTextColor}
+            />
             <BannerSlider slides={banner?.slides} isActive={banner?.isActive} />
           </motion.div>
 

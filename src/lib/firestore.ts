@@ -2073,6 +2073,9 @@ export const getBannerSettings = async (): Promise<BannerSettings> => {
     return {
       isActive: data.isActive ?? false,
       slides: data.slides ?? [],
+      announcementText: data.announcementText ?? "",
+      announcementBgColor: data.announcementBgColor ?? "",
+      announcementTextColor: data.announcementTextColor ?? "",
       updatedAt: timestampToDate(data.updatedAt),
     };
   } catch (error) {
@@ -2119,6 +2122,9 @@ export const getProviderBannerSettings =
       return {
         isActive: data.isActive ?? false,
         slides: data.slides ?? [],
+        announcementText: data.announcementText ?? "",
+        announcementBgColor: data.announcementBgColor ?? "",
+        announcementTextColor: data.announcementTextColor ?? "",
         updatedAt: timestampToDate(data.updatedAt),
       };
     } catch (error) {

@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { HomeHeader } from "@/components/layout/HomeHeader";
 import { BannerSlider } from "@/components/BannerSlider";
+import { AnnouncementBar } from "@/components/AnnouncementBar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 import {
@@ -285,6 +286,11 @@ const ProviderDashboardPage: React.FC = () => {
 
       <main className="container py-6">
         {/* Provider Promotional Banner */}
+        <AnnouncementBar
+          text={providerBanner?.announcementText}
+          backgroundColor={providerBanner?.announcementBgColor}
+          textColor={providerBanner?.announcementTextColor}
+        />
         <BannerSlider
           slides={providerBanner?.slides}
           isActive={providerBanner?.isActive}

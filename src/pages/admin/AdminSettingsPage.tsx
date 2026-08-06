@@ -940,6 +940,97 @@ const AdminSettingsPage: React.FC = () => {
             {t("admin.addSlide")}
           </Button>
 
+          {/* Announcement bar — independent of the slides above */}
+          <div className="space-y-3 rounded-lg border border-dashed p-3">
+            <Label htmlFor="client-announcement-text" className="text-sm font-medium">
+              {t("admin.announcementText")}
+            </Label>
+            <Input
+              id="client-announcement-text"
+              value={bannerForm.announcementText || ""}
+              onChange={(e) =>
+                setBannerForm((prev) => ({
+                  ...prev,
+                  announcementText: e.target.value,
+                }))
+              }
+              placeholder={t("admin.announcementTextPlaceholder")}
+              dir="auto"
+            />
+            {bannerForm.announcementText && (
+              <div
+                dir="auto"
+                className="rounded-xl px-3 py-2 text-center text-sm font-medium"
+                style={{
+                  backgroundColor: bannerForm.announcementBgColor || "#B5697D",
+                  color: bannerForm.announcementTextColor || "#ffffff",
+                }}
+              >
+                {bannerForm.announcementText}
+              </div>
+            )}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="client-announcement-bg">
+                  {t("admin.announcementBgColor")}
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="client-announcement-bg"
+                    type="color"
+                    value={bannerForm.announcementBgColor || "#B5697D"}
+                    onChange={(e) =>
+                      setBannerForm((prev) => ({
+                        ...prev,
+                        announcementBgColor: e.target.value,
+                      }))
+                    }
+                    className="h-10 w-14 p-1"
+                  />
+                  <Input
+                    value={bannerForm.announcementBgColor || "#B5697D"}
+                    onChange={(e) =>
+                      setBannerForm((prev) => ({
+                        ...prev,
+                        announcementBgColor: e.target.value,
+                      }))
+                    }
+                    className="flex-1"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="client-announcement-text-color">
+                  {t("admin.announcementTextColor")}
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="client-announcement-text-color"
+                    type="color"
+                    value={bannerForm.announcementTextColor || "#ffffff"}
+                    onChange={(e) =>
+                      setBannerForm((prev) => ({
+                        ...prev,
+                        announcementTextColor: e.target.value,
+                      }))
+                    }
+                    className="h-10 w-14 p-1"
+                  />
+                  <Input
+                    value={bannerForm.announcementTextColor || "#ffffff"}
+                    onChange={(e) =>
+                      setBannerForm((prev) => ({
+                        ...prev,
+                        announcementTextColor: e.target.value,
+                      }))
+                    }
+                    className="flex-1"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <Button
             onClick={handleBannerUpdate}
             disabled={updateBanner.isPending}
@@ -1061,6 +1152,98 @@ const AdminSettingsPage: React.FC = () => {
             )}
             {t("admin.addSlide")}
           </Button>
+
+          {/* Announcement bar — independent of the slides above */}
+          <div className="space-y-3 rounded-lg border border-dashed p-3">
+            <Label htmlFor="provider-announcement-text" className="text-sm font-medium">
+              {t("admin.announcementText")}
+            </Label>
+            <Input
+              id="provider-announcement-text"
+              value={providerBannerForm.announcementText || ""}
+              onChange={(e) =>
+                setProviderBannerForm((prev) => ({
+                  ...prev,
+                  announcementText: e.target.value,
+                }))
+              }
+              placeholder={t("admin.announcementTextPlaceholder")}
+              dir="auto"
+            />
+            {providerBannerForm.announcementText && (
+              <div
+                dir="auto"
+                className="rounded-xl px-3 py-2 text-center text-sm font-medium"
+                style={{
+                  backgroundColor:
+                    providerBannerForm.announcementBgColor || "#B5697D",
+                  color: providerBannerForm.announcementTextColor || "#ffffff",
+                }}
+              >
+                {providerBannerForm.announcementText}
+              </div>
+            )}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="provider-announcement-bg">
+                  {t("admin.announcementBgColor")}
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="provider-announcement-bg"
+                    type="color"
+                    value={providerBannerForm.announcementBgColor || "#B5697D"}
+                    onChange={(e) =>
+                      setProviderBannerForm((prev) => ({
+                        ...prev,
+                        announcementBgColor: e.target.value,
+                      }))
+                    }
+                    className="h-10 w-14 p-1"
+                  />
+                  <Input
+                    value={providerBannerForm.announcementBgColor || "#B5697D"}
+                    onChange={(e) =>
+                      setProviderBannerForm((prev) => ({
+                        ...prev,
+                        announcementBgColor: e.target.value,
+                      }))
+                    }
+                    className="flex-1"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="provider-announcement-text-color">
+                  {t("admin.announcementTextColor")}
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="provider-announcement-text-color"
+                    type="color"
+                    value={providerBannerForm.announcementTextColor || "#ffffff"}
+                    onChange={(e) =>
+                      setProviderBannerForm((prev) => ({
+                        ...prev,
+                        announcementTextColor: e.target.value,
+                      }))
+                    }
+                    className="h-10 w-14 p-1"
+                  />
+                  <Input
+                    value={providerBannerForm.announcementTextColor || "#ffffff"}
+                    onChange={(e) =>
+                      setProviderBannerForm((prev) => ({
+                        ...prev,
+                        announcementTextColor: e.target.value,
+                      }))
+                    }
+                    className="flex-1"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
 
           <Button
             onClick={handleProviderBannerUpdate}

@@ -516,6 +516,11 @@ export interface BannerSlide {
 export interface BannerSettings {
   isActive: boolean;
   slides: BannerSlide[];
+  // Independent announcement strip shown above the slider — empty text
+  // means no strip is shown at all.
+  announcementText?: string;
+  announcementBgColor?: string;
+  announcementTextColor?: string;
   updatedAt: Date;
 }
 
@@ -523,5 +528,8 @@ export interface BannerSettings {
 export interface ProviderBannerSettings {
   isActive: boolean;
   slides: BannerSlide[];
+  announcementText?: string;
+  announcementBgColor?: string;
+  announcementTextColor?: string;
   updatedAt: Date;
 }
