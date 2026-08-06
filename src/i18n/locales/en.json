@@ -24,6 +24,7 @@
     "noResults": "No results found",
     "all": "All",
     "seeAll": "See all",
+    "showLess": "Show less",
     "accept": "Accept",
     "decline": "Decline",
     "cookieTitle": "Your privacy matters.",
@@ -208,7 +209,6 @@
   },
   "search": {
     "placeholder": "Search services...",
-    "all": "All",
     "results": "Results",
     "sortBy": "Sort by",
     "nearest": "Nearest",
@@ -232,8 +232,7 @@
     "applyFilters": "Apply filters",
     "tryDifferent": "Try a different search term",
     "min": "min",
-    "clearAll": "Clear all",
-    "selectedCount": "{{count}} selected"
+    "clearAll": "Clear all"
   },
   "booking": {
     "validationError": "Please select date, time, and location.",

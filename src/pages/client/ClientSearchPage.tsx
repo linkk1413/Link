@@ -9,15 +9,12 @@ import {
   Star,
   Clock,
   ChevronRight,
-  X,
   Navigation,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Sheet,
   SheetContent,
@@ -27,6 +24,7 @@ import {
 } from "@/components/ui/sheet";
 import { Slider } from "@/components/ui/slider";
 import { CategoryIcon } from "@/components/CategoryIcon";
+import { CategoryCard } from "@/components/CategoryCard";
 import { useCategories } from "@/hooks/queries/useCategories";
 import { useServices } from "@/hooks/queries/useServices";
 import { useProvidersByIds } from "@/hooks/queries/useProviders";
@@ -91,15 +89,6 @@ const ClientSearchPage: React.FC = () => {
       // Support both single and multiple categories in URL
       const cats = categoryParam.split(",");
       setSelectedCategories(cats);
-    }
-
-    // Open filter sheet if openFilter param is present
-    const openFilterParam = searchParams.get("openFilter");
-    if (openFilterParam === "true") {
-      setFilterOpen(true);
-      // Remove the param from URL after opening
-      searchParams.delete("openFilter");
-      setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams]);
 
@@ -376,57 +365,6 @@ const ClientSearchPage: React.FC = () => {
                   <SheetTitle>{t("common.filter")}</SheetTitle>
                 </SheetHeader>
                 <div className="mt-6 space-y-6">
-                  {/* Categories */}
-                  <div>
-                    <div className="mb-3 flex items-center justify-between">
-                      <label className="text-sm font-medium">
-                        {t("home.categories")}
-                      </label>
-                      {selectedCategories.length > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-auto p-0 text-xs text-muted-foreground"
-                          onClick={clearCategories}
-                        >
-                          {t("search.clearAll")}
-                        </Button>
-                      )}
-                    </div>
-                    <ScrollArea className="h-48 rounded-lg border p-3">
-                      <div className="space-y-2">
-                        {categories.map((category) => (
-                          <label
-                            key={category.id}
-                            className="flex cursor-pointer items-center gap-3 rounded-lg p-2 hover:bg-accent"
-                          >
-                            <Checkbox
-                              checked={selectedCategories.includes(category.id)}
-                              onCheckedChange={() =>
-                                toggleCategory(category.id)
-                              }
-                            />
-                            <CategoryIcon
-                              icon={category.icon}
-                              size={18}
-                              className="text-primary"
-                            />
-                            <span className="text-sm">
-                              {isArabic ? category.nameAr : category.nameEn}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                    {selectedCategories.length > 0 && (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {t("search.selectedCount", {
-                          count: selectedCategories.length,
-                        })}
-                      </p>
-                    )}
-                  </div>
-
                   {/* Price Range Filter */}
                   <div>
                     <label className="mb-3 block text-sm font-medium">
@@ -597,46 +535,33 @@ const ClientSearchPage: React.FC = () => {
           animate="visible"
           variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
         >
-          {/* Category Filter */}
+          {/* Categories */}
           {categories.length > 0 && (
-            <motion.section variants={fadeInUp} className="mb-4">
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                <Button
-                  variant={
-                    selectedCategories.length === 0 ? "default" : "outline"
-                  }
-                  size="sm"
-                  className="shrink-0 rounded-full"
-                  onClick={clearCategories}
-                >
-                  {t("search.all")}
-                </Button>
-                {categories.map((category) => (
+            <motion.section variants={fadeInUp} className="mb-6">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-foreground">
+                  {t("home.categories")}
+                </h2>
+                {selectedCategories.length > 0 && (
                   <Button
-                    key={category.id}
-                    variant={
-                      selectedCategories.includes(category.id)
-                        ? "default"
-                        : "outline"
-                    }
+                    variant="ghost"
                     size="sm"
-                    className="shrink-0 gap-1.5 rounded-full"
-                    onClick={() => toggleCategory(category.id)}
+                    className="h-auto p-0 text-xs text-muted-foreground"
+                    onClick={clearCategories}
                   >
-                    {category.imageUrl ? (
-                      <img
-                        src={category.imageUrl}
-                        alt=""
-                        className="h-5 w-5 rounded object-cover"
-                      />
-                    ) : (
-                      <CategoryIcon icon={category.icon} size={14} />
-                    )}
-                    <span>{isArabic ? category.nameAr : category.nameEn}</span>
-                    {selectedCategories.includes(category.id) && (
-                      <X className="h-3 w-3" />
-                    )}
+                    {t("search.clearAll")}
                   </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-4 gap-3 md:grid-cols-8">
+                {categories.map((category) => (
+                  <CategoryCard
+                    key={category.id}
+                    category={category}
+                    isArabic={isArabic}
+                    selected={selectedCategories.includes(category.id)}
+                    onClick={() => toggleCategory(category.id)}
+                  />
                 ))}
               </div>
             </motion.section>

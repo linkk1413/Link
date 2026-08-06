@@ -24,6 +24,7 @@
     "noResults": "لم يتم العثور على نتائج",
     "all": "الكل",
     "seeAll": "عرض الكل",
+    "showLess": "عرض أقل",
     "accept": "موافقة",
     "decline": "رفض",
     "cookieTitle": "خصوصيتك مهمة.",
@@ -208,7 +209,6 @@
   },
   "search": {
     "placeholder": "البحث عن خدمات...",
-    "all": "الكل",
     "results": "النتائج",
     "priceRange": "نطاق السعر",
     "maxDistance": "أقصى مسافة",
@@ -232,8 +232,7 @@
     "topRated": "الأعلى تقييماً",
     "tryDifferent": "جربي مصطلح بحث مختلف",
     "min": "دقيقة",
-    "clearAll": "مسح الكل",
-    "selectedCount": "{{count}} محدد"
+    "clearAll": "مسح الكل"
   },
   "booking": {
     "selectDate": "اختاري التاريخ",

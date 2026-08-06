@@ -1,7 +1,7 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
   Star,
@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { HomeHeader } from "@/components/layout/HomeHeader";
 import { BannerSlider } from "@/components/BannerSlider";
-import { CategoryIcon } from "@/components/CategoryIcon";
+import { CategoryCard } from "@/components/CategoryCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGuest } from "@/contexts/GuestContext";
 import { useRequestTrackingConsent } from "@/components/TrackingConsent";
@@ -41,6 +41,7 @@ const ClientHomePage: React.FC = () => {
   const { isGuest } = useGuest();
   const navigate = useNavigate();
   const isArabic = i18n.language === "ar";
+  const [showAllCategories, setShowAllCategories] = useState(false);
 
   const {
     location,
@@ -250,14 +251,16 @@ const ClientHomePage: React.FC = () => {
               <h2 className="text-lg font-semibold text-foreground">
                 {t("home.categories")}
               </h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-primary"
-                onClick={() => navigate("/client/search?openFilter=true")}
-              >
-                {t("common.seeAll")}
-              </Button>
+              {categories.length > 8 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-primary"
+                  onClick={() => setShowAllCategories((v) => !v)}
+                >
+                  {showAllCategories ? t("common.showLess") : t("common.seeAll")}
+                </Button>
+              )}
             </div>
             {loadingCategories || loadingServices ? (
               <div className="grid grid-cols-4 gap-3 md:grid-cols-8">
@@ -270,32 +273,44 @@ const ClientHomePage: React.FC = () => {
                 {t("home.noCategories")}
               </div>
             ) : (
-              <div className="grid grid-cols-4 gap-3 md:grid-cols-8">
-                {categories.slice(0, 8).map((category) => (
-                  <button
-                    key={category.id}
-                    onClick={() =>
-                      navigate(`/client/search?category=${category.id}`)
-                    }
-                    className="flex flex-col items-center rounded-2xl bg-card p-2 transition-all hover:bg-accent card-glow"
-                  >
-                    {category.imageUrl ? (
-                      <img
-                        src={category.imageUrl}
-                        alt={isArabic ? category.nameAr : category.nameEn}
-                        className="mb-2 h-20 w-20 rounded-lg object-cover"
-                      />
-                    ) : (
-                      <div className="mb-2 flex h-20 w-20 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <CategoryIcon icon={category.icon} size={36} />
+              <>
+                <div className="grid grid-cols-4 gap-3 md:grid-cols-8">
+                  {categories.slice(0, 8).map((category) => (
+                    <CategoryCard
+                      key={category.id}
+                      category={category}
+                      isArabic={isArabic}
+                      onClick={() =>
+                        navigate(`/client/search?category=${category.id}`)
+                      }
+                    />
+                  ))}
+                </div>
+                <AnimatePresence initial={false}>
+                  {showAllCategories && categories.length > 8 && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="mt-3 grid grid-cols-4 gap-3 md:grid-cols-8">
+                        {categories.slice(8).map((category) => (
+                          <CategoryCard
+                            key={category.id}
+                            category={category}
+                            isArabic={isArabic}
+                            onClick={() =>
+                              navigate(`/client/search?category=${category.id}`)
+                            }
+                          />
+                        ))}
                       </div>
-                    )}
-                    <span className="text-xs font-medium text-card-foreground text-center line-clamp-1">
-                      {isArabic ? category.nameAr : category.nameEn}
-                    </span>
-                  </button>
-                ))}
-              </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
             )}
           </motion.section>
 
