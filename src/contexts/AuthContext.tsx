@@ -38,22 +38,6 @@ const apiBaseUrl =
   import.meta.env.VITE_PAYPAL_API_BASE_URL ||
   "";
 
-// A resumed session (persisted Firebase auth, no fresh OTP) is only good
-// for this long since the last time the app was actually used — after that
-// it's treated as expired and the user has to log in again.
-const SESSION_IDLE_MS = 24 * 60 * 60 * 1000;
-const LAST_ACTIVITY_KEY = "link_last_activity_at";
-
-const markActivity = () => {
-  localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
-};
-
-const isSessionExpired = () => {
-  const lastActivity = Number(localStorage.getItem(LAST_ACTIVITY_KEY));
-  if (!lastActivity) return false;
-  return Date.now() - lastActivity > SESSION_IDLE_MS;
-};
-
 interface AuthContextType {
   user: User | null;
   firebaseUser: FirebaseUser | null;
@@ -110,19 +94,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setFirebaseUser(fbUser);
 
       if (fbUser) {
-        // A resumed session (this listener firing on app load from a
-        // persisted Firebase auth state, not a fresh login) that's been idle
-        // longer than SESSION_IDLE_MS is treated as expired.
-        if (isSessionExpired()) {
-          await signOut(auth);
-          localStorage.removeItem(LAST_ACTIVITY_KEY);
-          setUser(null);
-          setFirebaseUser(null);
-          setIsLoading(false);
-          return;
-        }
-        markActivity();
-
         try {
           // Get user document from Firestore
           const userDoc = await getUserDocument(fbUser.uid);
@@ -169,14 +140,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Cleanup subscription
     return () => unsubscribe();
   }, []);
-
-  // Keep the idle timer from expiring during a long, continuously-open
-  // session — only actual absence should count toward SESSION_IDLE_MS.
-  useEffect(() => {
-    if (!user) return;
-    const interval = setInterval(markActivity, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [user]);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -255,7 +218,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       await signInWithCustomToken(auth, data.customToken);
-      markActivity();
 
       // Set the user doc ourselves rather than waiting on the
       // onAuthStateChanged listener's own (also-triggered) fetch, so the
@@ -394,7 +356,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     try {
       await signOut(auth);
-      localStorage.removeItem(LAST_ACTIVITY_KEY);
       setUser(null);
       setFirebaseUser(null);
     } catch (error) {
