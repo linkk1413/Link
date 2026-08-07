@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getAdminAlertCounts } from "@/lib/firestore";
 import { AdminGlobalSearch } from "@/components/admin/AdminGlobalSearch";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const adminNavItems = [
   {
@@ -84,6 +85,7 @@ export const AdminLayout: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const isRTL = i18n.language === "ar";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -255,7 +257,11 @@ export const AdminLayout: React.FC = () => {
       {/* Main content */}
       <div className="md:ms-64">
         <main className="p-4 md:p-6">
-          <Outlet />
+          {/* Keyed by route so a caught error clears itself on navigation
+              instead of sticking around after the admin leaves the page. */}
+          <ErrorBoundary key={location.pathname} label={t("admin.title")}>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>

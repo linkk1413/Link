@@ -78,6 +78,39 @@ export const timestampToDate = (timestamp: Timestamp | null): Date => {
   return timestamp?.toDate() || new Date();
 };
 
+// Convert an optional Firestore timestamp field to a Date, leaving it
+// undefined if it was never set (as opposed to timestampToDate, which
+// defaults to "now" — wrong for a field like subscriptionEndDate where
+// "never set" and "now" mean very different things).
+const optionalTimestampToDate = (
+  timestamp: Timestamp | undefined,
+): Date | undefined => timestamp?.toDate();
+
+// Provider docs carry several optional subscription/payment timestamp
+// fields. Spreading the raw doc (as several call sites do) leaves these as
+// raw Firestore Timestamp objects instead of JS Dates — harmless until
+// something calls .toISOString()/.getTime() on one and throws. Convert them
+// all in one place instead of repeating this at every call site.
+const convertProviderTimestamps = (
+  data: FirestoreProviderProfile,
+): Partial<ProviderProfile> => ({
+  subscriptionStartDate: optionalTimestampToDate(
+    data.subscriptionStartDate as unknown as Timestamp | undefined,
+  ),
+  subscriptionEndDate: optionalTimestampToDate(
+    data.subscriptionEndDate as unknown as Timestamp | undefined,
+  ),
+  cancellationDate: optionalTimestampToDate(
+    data.cancellationDate as unknown as Timestamp | undefined,
+  ),
+  lastPaymentDate: optionalTimestampToDate(
+    data.lastPaymentDate as unknown as Timestamp | undefined,
+  ),
+  lastSubscriptionPaymentDate: optionalTimestampToDate(
+    data.lastSubscriptionPaymentDate as unknown as Timestamp | undefined,
+  ),
+});
+
 // User document operations
 export interface FirestoreUser {
   uid: string;
@@ -855,6 +888,7 @@ export const getProviderProfile = async (
       ...data,
       displayName,
       updatedAt: timestampToDate(data.updatedAt),
+      ...convertProviderTimestamps(data),
     };
   } catch (error) {
     console.warn("Error fetching provider:", error);
@@ -884,6 +918,7 @@ export const getProvidersByIds = async (
         providers.push({
           ...data,
           updatedAt: timestampToDate(data.updatedAt),
+          ...convertProviderTimestamps(data),
         });
       });
     }
@@ -928,6 +963,7 @@ export const getVerifiedProviders = async (
       return {
         ...data,
         updatedAt: timestampToDate(data.updatedAt),
+        ...convertProviderTimestamps(data),
       };
     });
 

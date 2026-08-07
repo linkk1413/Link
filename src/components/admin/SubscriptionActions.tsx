@@ -30,8 +30,14 @@ import {
 } from "@/lib/firestore";
 import { ProviderProfile } from "@/types";
 
-const toDateInputValue = (date?: Date) =>
-  date ? new Date(date).toISOString().split("T")[0] : "";
+// Provider dates come from Firestore and, on old/malformed docs, might not
+// convert cleanly — never throw on a bad value, just fall back to empty.
+const toDateInputValue = (date?: Date) => {
+  if (!date) return "";
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().split("T")[0];
+};
 
 interface SubscriptionActionsProps {
   provider: ProviderProfile;

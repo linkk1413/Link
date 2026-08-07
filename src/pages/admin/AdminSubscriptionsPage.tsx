@@ -56,17 +56,16 @@ const AdminSubscriptionsPage: React.FC = () => {
 
   const formatDate = (date: Date | undefined) => {
     if (!date) return t("admin.notProvided");
-    return new Date(date).toLocaleDateString();
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) return t("admin.notProvided");
+    return parsed.toLocaleDateString();
   };
 
   const daysUntilExpiry = (endDate: Date | undefined) => {
     if (!endDate) return -1;
-    const today = new Date();
     const end = new Date(endDate);
-    const diff = Math.ceil(
-      (end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-    );
-    return diff;
+    if (Number.isNaN(end.getTime())) return -1;
+    return Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   };
 
   // Filter subscriptions

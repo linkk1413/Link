@@ -472,14 +472,16 @@ const AdminUserDetailPage: React.FC = () => {
     return <Badge variant="destructive">{t("admin.suspended")}</Badge>;
   };
 
-  const formatDate = (date?: Date) =>
-    date
-      ? new Date(date).toLocaleDateString(isArabic ? "ar-SA" : "en-US", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        })
-      : t("admin.notProvided");
+  const formatDate = (date?: Date) => {
+    if (!date) return t("admin.notProvided");
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) return t("admin.notProvided");
+    return parsed.toLocaleDateString(isArabic ? "ar-SA" : "en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
 
   const formatDateTime = (date: Date) =>
     new Date(date).toLocaleString(isArabic ? "ar-SA" : "en-US", {
@@ -492,10 +494,9 @@ const AdminUserDetailPage: React.FC = () => {
 
   const daysUntilExpiry = (endDate: Date | undefined) => {
     if (!endDate) return null;
-    const diff = Math.ceil(
-      (new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
-    );
-    return diff;
+    const parsed = new Date(endDate);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return Math.ceil((parsed.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   };
 
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
@@ -921,10 +922,16 @@ const AdminUserDetailPage: React.FC = () => {
           </TabsContent>
 
           {/* ===== Subscription ===== */}
-          {isProviderDetails && providerProfile && (
+          {isProviderDetails && (
             <TabsContent value="subscription" className="mt-4">
               <div className="rounded-lg border border-border p-4">
-                <SubscriptionActions provider={providerProfile} />
+                {providerProfile ? (
+                  <SubscriptionActions provider={providerProfile} />
+                ) : (
+                  <p className="py-8 text-center text-muted-foreground">
+                    {t("admin.noSubscriptionForUser")}
+                  </p>
+                )}
               </div>
             </TabsContent>
           )}
